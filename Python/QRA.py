@@ -7,6 +7,7 @@ import sys
 from datetime import datetime, timedelta
 import pandas as pd
 
+
 data = pd.read_csv('lear_forecast.csv', index_col=0) # contains 5 forecast columns and real price
 data.loc[data.index[:], 'ones'] = 1.0
 data.index = [datetime.strptime(e, '%Y-%m-%d %H:%M:%S') for e in data.index]
@@ -35,6 +36,11 @@ def quantreg_day(dno):
         h_res.sort()
         prob[:, h] = h_res
     np.savetxt(os.path.join('..', 'lear_QRA', d), prob, delimiter=',', fmt='%.3f')
+    print(str(d))
 
-with Pool() as p:
-    _ = p.map(quantreg_day, list(range(736-182)))
+
+
+if __name__ == '__main__':
+    with Pool(max(os.cpu_count() // 2, 1)) as p:
+        _ = p.map(quantreg_day, list(range(736-182)))
+

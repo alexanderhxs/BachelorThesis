@@ -18,7 +18,7 @@ import json
 #     cty (currently only DE), default: DE
 #     distribution (Normal, StudentT, JSU, SinhArcsinh and NormalInverseGaussian), default: Normal
 
-distribution = 'Normal'
+distribution = 'JSU'
 paramcount = {'Normal': 2,
               'StudentT': 3,
               'JSU': 4,
@@ -266,17 +266,27 @@ def runoneday(inp):
 
 optuna.logging.get_logger('optuna').addHandler(logging.StreamHandler(sys.stdout))
 study_name = f'FINAL_DE_selection_prob_{distribution.lower()}' # 'on_new_data_no_feature_selection'
-storage_name = f'sqlite:///../trialfiles/{study_name}'
-study = optuna.create_study(study_name=study_name, storage=storage_name, load_if_exists=True)
-print(study.trials_dataframe())
+storage_name = f'sqlite:///../trialfiles/{study_name}3'
+
+summaries = optuna.get_all_study_summaries(storage=storage_name)
+for summary in summaries:
+    print(summary.study_name)
+
+study = optuna.load_study(study_name=study_name, storage=storage_name)
+#print(study.trials_dataframe())
+
+table_names = study.get_trials()
+#print(table_names)
+
 best_params = study.best_params
 print(best_params)
 
 inputlist = [(best_params, day) for day in range(len(data) // 24 - 1456)]
 print(len(inputlist))
 
-# for e in inputlist:
+#for e in inputlist:
 #     _ = runoneday(e)
-
-with Pool(max(os.cpu_count() // 4, 1)) as p:
-    _ = p.map(runoneday, inputlist)
+print(os.cpu_count())
+if __name__ == '__main__':
+    with Pool(max(3, 1)) as p:
+        _ = p.map(runoneday, inputlist)

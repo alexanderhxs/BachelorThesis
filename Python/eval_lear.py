@@ -25,7 +25,8 @@ for cl in cal_lens:
         wholedf.loc[e.index[:], 'real'] = e.loc[e.index[:], 'real'].to_numpy()
         wholedf.loc[e.index[:], 'forecast'] = e.loc[e.index[:], 'forecast'].to_numpy()
     
-    evaldf = wholedf.iloc[182*24:]
+#   evaldf = wholedf.iloc[182*24:]
+    evaldf = wholedf
     mae = np.abs((evaldf.real - evaldf.forecast).to_numpy()).mean()
     rmse = np.sqrt(((evaldf.real - evaldf.forecast).to_numpy()**2).mean())
     print(f'CAL LEN: {cl}')
@@ -40,7 +41,7 @@ for cl in cal_lens[1:]:
     wholedf.loc[temp.index[:], f'forecast{cl}'] = temp.loc[temp.index[:], 'forecast'].to_numpy()
 wholedf.loc[wholedf.index[:], 'forecast_averaged'] = wholedf.drop(columns='real').mean(axis='columns').to_numpy()
 wholedf.to_csv(f'lear_forecast.csv')
-wholedf = wholedf.iloc[182*24:]
+#wholedf = wholedf.iloc[182*24:]
 mae = np.abs((wholedf.real - wholedf.forecast_averaged).to_numpy()).mean()
 rmse = np.sqrt(((wholedf.real - wholedf.forecast_averaged).to_numpy()**2).mean())
 print(f'ENSEMBLE OF 4 LENGTHS')

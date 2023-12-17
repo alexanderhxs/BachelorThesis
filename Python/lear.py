@@ -23,7 +23,7 @@ INP_SIZE = 221
 binopt = [True, False]
 
 cty = sys.argv[1]
-
+#cty = 'DE'
 # read data file
 data = pd.read_csv(f'../Datasets/{cty}.csv', index_col=0)
 data.index = [datetime.strptime(e, '%Y-%m-%d %H:%M:%S') for e in data.index]
@@ -89,10 +89,11 @@ def runoneday(inp):
 # print(study.trials_dataframe())
 
 inputlist = [(int(sys.argv[2]), day) for day in range(len(data) // 24 - 1456)]
+#inputlist = [(int(56), day) for day in range(len(data) // 24 - 1456)]
 print(len(inputlist))
+print(inputlist[:10])
+for e in inputlist:
+     _ = runoneday(e)
 
-# for e in inputlist:
-#     _ = runoneday(e)
-
-with Pool(max(2, os.cpu_count() - 4)) as p:
-    _ = p.map(runoneday, inputlist)
+#with Pool(max(2, os.cpu_count() - 4)) as p:
+#    _ = p.map(runoneday, inputlist)

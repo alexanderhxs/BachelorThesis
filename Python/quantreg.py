@@ -13,7 +13,7 @@ def quantreg(x, y, tau):
     # return minimize(rho, pmean, method='COBYLA', tol=None, options={'maxiter': 25, 'disp': False}).x
     # return minimize(rho, pmean, method='TNC', options={'disp': False}).x
     # return minimize(rho, pmean, method='TNC', tol=None, options={'maxiter': 25, 'disp': False}).x
-    return minimize(rho, pmean, method='TNC', tol=None, options={'maxiter': 10 * len(pmean), 'disp': False}).x
+    return minimize(rho, pmean, method='L-BFGS-B', tol=None, options={'maxiter': 10 * len(pmean), 'disp': False}).x
     # return minimize(rho, pmean, method='L-BFGS-B', options={'disp': False}).x
     # return minimize(rho, pmean, method='L-BFGS-B', tol=None, options={'maxiter': 25, 'disp': False}).x
     # return minimize(rho, pmean, method='BFGS', options={'disp': False}).x

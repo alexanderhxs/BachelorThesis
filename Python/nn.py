@@ -16,7 +16,7 @@ import time
 #     cty (currently only DE), default: DE
 #     distribution (Normal, StudentT, JSU, SinhArcsinh and NormalInverseGaussian), default: Normal
 
-distribution = 'Normal'
+distribution = 'JSU'
 paramcount = {'Normal': 2,
               'StudentT': 3,
               'JSU': 4,
@@ -132,7 +132,7 @@ def objective(trial):
         inputs = keras.Input(X.shape[1]) # <= INP_SIZE as some columns might have been turned off
         # batch normalization
         # we decided to always normalize the inputs
-        batchnorm = True#trial.suggest_categorical('batch_normalization', [True, False])
+        batchnorm = True #trial.suggest_categorical('batch_normalization', [True, False])
         if batchnorm:
             norm = keras.layers.BatchNormalization()(inputs)
             last_layer = norm
