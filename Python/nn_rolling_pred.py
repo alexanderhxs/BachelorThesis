@@ -266,7 +266,7 @@ def runoneday(inp):
 
 optuna.logging.get_logger('optuna').addHandler(logging.StreamHandler(sys.stdout))
 study_name = f'FINAL_DE_selection_prob_{distribution.lower()}' # 'on_new_data_no_feature_selection'
-storage_name = f'sqlite:///../trialfiles/{study_name}3'
+storage_name = f'sqlite:///../trialfiles/{study_name}4'
 
 summaries = optuna.get_all_study_summaries(storage=storage_name)
 for summary in summaries:
