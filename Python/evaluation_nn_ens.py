@@ -15,8 +15,6 @@ def pinball_score(observed, pred_quantiles):
     quantiles = np.arange(0.01, 1, 0.01)
     scores = pd.Series(np.maximum((1 - quantiles) * (pred_quantiles - observed), quantiles * (observed - pred_quantiles)))
     return scores.mean()
-def merger(arrays):
-    return
 
 param_dfs = []
 
