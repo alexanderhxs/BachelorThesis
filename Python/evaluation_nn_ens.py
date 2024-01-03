@@ -4,8 +4,14 @@ import pandas as pd
 import scipy.stats as sps
 import properscoring as ps
 import json
+import sys
 
-data = pd.read_csv('../Datasets/DE.csv', index_col=0)
+print('\n\n')
+print(sys.executable)
+try:
+    data = pd.read_csv('../Datasets/DE.csv', index_col=0)
+except:
+    data = pd.read_csv('/home/ahaas/BachelorThesis/Datasets/DE.csv', index_col=0)
 
 distribution = 'JSU'
 num_runs = 4
@@ -20,11 +26,20 @@ param_dfs = []
 
 #load data
 for num in range(num_runs):
-    if num_runs == 1:
-        file_path = f'../distparams_probNN_{distribution.lower()}_1'
-    else:
-        file_path = f'../distparams_probNN_{distribution.lower()}_{num+1}'
-    dist_file_list = sorted(os.listdir(file_path))
+    try:
+        if num_runs == 1:
+            file_path = f'../distparams_probNN_{distribution.lower()}_1'
+        else:
+            file_path = f'../distparams_probNN_{distribution.lower()}_{num+1}'
+
+        dist_file_list = sorted(os.listdir(file_path))
+    except:
+        if num_runs == 1:
+            file_path = f'/home/ahaas/BachelorThesis/distparams_probNN_{distribution.lower()}_1'
+        else:
+            file_path = f'/home/ahaas/BachelorThesis/distparams_probNN_{distribution.lower()}_{num + 1}'
+        dist_file_list = sorted(os.listdir(file_path))
+
     dist_params = pd.DataFrame()
     for file in dist_file_list:
         with open(os.path.join(file_path, file)) as f:

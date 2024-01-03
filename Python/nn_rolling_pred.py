@@ -18,6 +18,9 @@ import json
 #     cty (currently only DE), default: DE
 #     distribution (Normal, StudentT, JSU, SinhArcsinh and NormalInverseGaussian), default: Normal
 
+print('\n\n')
+print(sys.executable)
+
 distribution = 'JSU'
 paramcount = {'Normal': 2,
               'StudentT': 3,
@@ -37,14 +40,24 @@ if len(sys.argv) > 1:
 if len(sys.argv) > 2:
     distribution = sys.argv[2]
 
-if not os.path.exists(f'../forecasts_probNN_{distribution.lower()}'):
-    os.mkdir(f'../forecasts_probNN_{distribution.lower()}')
+if sys.executable != '/home/ahaas/.virtualenvs/BachelorThesis/bin/python':
+    if not os.path.exists(f'../forecasts_probNN_{distribution.lower()}'):
+        os.mkdir(f'../forecasts_probNN_{distribution.lower()}')
 
-if not os.path.exists(f'../distparams_probNN_{distribution.lower()}'):
-    os.mkdir(f'../distparams_probNN_{distribution.lower()}')
+    if not os.path.exists(f'../distparams_probNN_{distribution.lower()}'):
+        os.mkdir(f'../distparams_probNN_{distribution.lower()}')
 
-if not os.path.exists(f'../trialfiles'):
-    os.mkdir(f'../trialfiles')
+    if not os.path.exists(f'../trialfiles'):
+        os.mkdir(f'../trialfiles')
+else:
+    if not os.path.exists(f'/home/ahaas/BachelorThesis/forecasts_probNN_{distribution.lower()}'):
+        os.mkdir(f'/home/ahaas/BachelorThesis/forecasts_probNN_{distribution.lower()}')
+
+    if not os.path.exists(f'/home/ahaas/BachelorThesis/distparams_probNN_{distribution.lower()}'):
+        os.mkdir(f'/home/ahaas/BachelorThesis/distparams_probNN_{distribution.lower()}')
+
+    if not os.path.exists(f'/home/ahaas/BachelorThesis/trialfiles'):
+        os.mkdir(f'/home/ahaas/BachelorThesis/trialfiles')
 
 print(cty, distribution)
 
@@ -54,7 +67,11 @@ if distribution not in paramcount:
     raise ValueError('Incorrect distribution')
 
 # read data file
-data = pd.read_csv(f'../Datasets/{cty}.csv', index_col=0)
+try:
+    data = pd.read_csv('../Datasets/DE.csv', index_col=0)
+except:
+    data = pd.read_csv('/home/ahaas/BachelorThesis/Datasets/DE.csv', index_col=0)
+
 data.index = [datetime.strptime(e, '%Y-%m-%d %H:%M:%S') for e in data.index]
 # data = data.iloc[:4*364*24] # take the first 4 years - 1456 days
 
@@ -252,7 +269,7 @@ def runoneday(inp):
         predDF['real'] = df.loc[df.index[-24:], 'Price'].to_numpy()
         predDF['forecast'] = pd.NA
         predDF.loc[predDF.index[:], 'forecast'] = pred.mean(0)
-        # predDF.to_csv(os.path.join('../forecasts', datetime.strftime(df.index[-24], '%Y-%m-%d')))
+        predDF.to_csv(os.path.join('../forecasts', datetime.strftime(df.index[-24], '%Y-%m-%d')))
         np.savetxt(os.path.join(f'../forecasts_probNN_{distribution.lower()}', datetime.strftime(df.index[-24], '%Y-%m-%d')), pred, delimiter=',', fmt='%.3f')
     else:
         predDF = pd.DataFrame(index=df.index[-24:])
@@ -266,7 +283,7 @@ def runoneday(inp):
 
 optuna.logging.get_logger('optuna').addHandler(logging.StreamHandler(sys.stdout))
 study_name = f'FINAL_DE_selection_prob_{distribution.lower()}' # 'on_new_data_no_feature_selection'
-storage_name = f'sqlite:///../trialfiles/{study_name}4'
+storage_name = f'sqlite:////home/ahaas/BachelorThesis/trialfiles/{study_name}4'
 
 summaries = optuna.get_all_study_summaries(storage=storage_name)
 for summary in summaries:
