@@ -152,8 +152,8 @@ def runoneday(inp):
         rate = params['dropout_rate'] # trial.suggest_float('dropout_rate', 0, 1)
         drop = keras.layers.Dropout(rate)(last_layer)
         last_layer = drop
-    # regularization of 1st hidden layer, 
-    #activation - output, kernel - weights/parameters of input
+
+    # regularization of 1st hidden layer,
     regularize_h1_activation = params['regularize_h1_activation']
     regularize_h1_kernel = params['regularize_h1_kernel']
     h1_activation_rate = (0.0 if not regularize_h1_activation 
@@ -234,7 +234,7 @@ def runoneday(inp):
                         skewness=t[..., 72:]))(linear) 
         else:
             raise ValueError(f'Incorrect distribution {distribution}')
-        model = keras.Model(inputs = inputs, outputs=outputs)
+        model = keras.Model(inputs=inputs, outputs=outputs)
         model.compile(optimizer=keras.optimizers.Adam(params['learning_rate']),
                       loss=lambda y, rv_y: -rv_y.log_prob(y),
                       metrics='mae')
