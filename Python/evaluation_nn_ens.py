@@ -13,8 +13,8 @@ try:
 except:
     data = pd.read_csv('/home/ahaas/BachelorThesis/Datasets/DE.csv', index_col=0)
 
-distribution = 'JSU'
-num_runs = 4
+distribution = 'Normal'
+num_runs = 1
 quantile_array = np.arange(0.01, 1, 0.01)
 
 def pinball_score(observed, pred_quantiles):
@@ -35,7 +35,7 @@ for num in range(num_runs):
         dist_file_list = sorted(os.listdir(file_path))
     except:
         if num_runs == 1:
-            file_path = f'/home/ahaas/BachelorThesis/distparams_probNN_{distribution.lower()}_1'
+            file_path = f'/home/ahaas/BachelorThesis/distparams_leadNN_{distribution.lower()}_4'
         else:
             file_path = f'/home/ahaas/BachelorThesis/distparams_probNN_{distribution.lower()}_{num + 1}'
         dist_file_list = sorted(os.listdir(file_path))
