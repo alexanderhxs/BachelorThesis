@@ -43,24 +43,24 @@ def runoneday(inp):
     params, dayno = inp
     df = data.iloc[dayno*24:dayno*24+1456*24+24]
     # prepare the input/output dataframes
-    Y = data.loc[:, 'Price'].to_numpy()
-    Y = Y[7*24:] # skip first 7 days
+    Y = df.iloc[:, 0].to_numpy()
+    Y = Y[7*24:-24] # skip first 7 days
 
     X = np.zeros(((1456+1)*24, 15))
-    for d in range(7*24, (1456+1)*24):
-        X[d, 0] = df.iloc[(d-1):(d), 0].to_numpy() # D-1 price
-        X[d, 1] = df.iloc[(d-2):(d-1), 0].to_numpy() # D-2 price
-        X[d, 2] = df.iloc[(d-3):(d-2), 0].to_numpy() # D-3 price
-        X[d, 3] = df.iloc[(d-7):(d-6), 0].to_numpy() # D-7 price
-        X[d, 4] = df.iloc[(d):(d+1), 1].to_numpy() # D load forecast
-        X[d, 5] = df.iloc[(d-1):(d), 1].to_numpy() # D-1 load forecast
-        X[d, 6] = df.iloc[(d-7):(d-6), 1].to_numpy() # D-7 load forecast
-        X[d, 7] = df.iloc[(d):(d+1), 2].to_numpy() # D RES sum forecast
-        X[d, 8] = df.iloc[(d-1):(d), 2].to_numpy() # D-1 RES sum forecast
-        X[d, 9] = df.iloc[(d-2):(d-1), 3].to_numpy() # D-2 EUA
-        X[d, 10] = df.iloc[(d-2):(d-1), 4].to_numpy() # D-2 API2_Coal
-        X[d, 11] = df.iloc[(d-2):(d-1), 5].to_numpy() # D-2 TTF_Gas
-        X[d, 12] = df.iloc[(d-2):(d-1), 6].to_numpy() # D-2 Brent oil
+    for d in range(7*24, (1456*24)+24):
+        X[d, 0] = df.iloc[(d-1*24), 0] # D-1 price
+        X[d, 1] = df.iloc[(d-2*24), 0] # D-2 price
+        X[d, 2] = df.iloc[(d-3*24), 0] # D-3 price
+        X[d, 3] = df.iloc[(d-7*24), 0] # D-7 price
+        X[d, 4] = df.iloc[d, 1] # D load forecast
+        X[d, 5] = df.iloc[(d-1*24), 1] # D-1 load forecast
+        X[d, 6] = df.iloc[(d-7*24), 1] # D-7 load forecast
+        X[d, 7] = df.iloc[d, 2] # D RES sum forecast
+        X[d, 8] = df.iloc[(d-1*24), 2] # D-1 RES sum forecast
+        X[d, 9] = df.iloc[(d-2*24), 3] # D-2 EUA
+        X[d, 10] = df.iloc[(d-2*24), 4] # D-2 API2_Coal
+        X[d, 11] = df.iloc[(d-2*24), 5] # D-2 TTF_Gas
+        X[d, 12] = df.iloc[(d-2*24), 6] # D-2 Brent oil
         X[d, 13] = df.index[d].weekday()
         X[d, 14] = df.index[d].hour #lead time
     # '''
@@ -97,7 +97,7 @@ def runoneday(inp):
     colmask[14] = True
     X = X[:, colmask]
     Xf = X[-24:, :]
-    X = X[(7*24):-1, :]
+    X = X[(7*24):-24, :]
 
     inputs = keras.Input(X.shape[1])  # <= INP_SIZE as some columns might have been turned off
     # batch normalization

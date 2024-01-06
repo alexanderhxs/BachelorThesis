@@ -5,7 +5,19 @@ import matplotlib.pyplot as plt
 import json
 
 #load data
-filepath = '/home/ahaas/BachelorThesis/distparams_leadNN_normal_4'
+data = pd.read_csv('/home/ahaas/BachelorThesis/Datasets/DE.csv', index_col=0)
+data = data.iloc[:, 0]
+data.index = pd.to_datetime(data.index, format='%Y-%m-%d %H:%M:%S')
+plt_data = data.groupby(data.index.hour).agg(list)
+plt.violinplot(plt_data,
+               showmeans=True,
+                showextrema=True,
+                quantiles=[[.05, .95] for _ in range(len(plt_data))])
+plt.plot(range(1,25), plt_data.apply(np.mean), linewidth=1)
+plt.show()
+
+#load params
+filepath = '/home/ahaas/BachelorThesis/distparams_singleNN_normal4'
 #load data
 def load_data(filepath):
     dist_params = pd.DataFrame()
@@ -18,19 +30,18 @@ def load_data(filepath):
         dist_params = pd.concat([dist_params, fc_df])
     return dist_params
 
-#fuction to plot boxplots for every hour
-def violon_per_hour(dist_params):
-    data = dist_params['loc'].groupby(dist_params.index.hour).agg(list)
+#function to plot boxplots for every hour
+def violon_per_hour(dist_params, parameter):
+    data = dist_params[parameter].groupby(dist_params.index.hour).agg(list)
     plt.violinplot(data,
                    showmeans=True,
                    showextrema=True,
                    quantiles=[[.05, .95] for _ in range(len(data))])
-    plt.plot(range(1, 25), dist_params['loc'].groupby(dist_params.index.hour).mean(), linewidth= 1)
+    plt.plot(range(1, 25), dist_params[parameter].groupby(dist_params.index.hour).mean(), linewidth= 1)
     plt.show()
-    if not os.path.exists('/home/ahaas/BachelorThesis/Plots'):
-        os.mkdir('/home/ahaas/BachelorThesis/Plots')
-    plt.savefig('/home/ahaas/BachelorThesis/Plots/prob_normal_1.svg')
+    #if not os.path.exists('/home/ahaas/BachelorThesis/Plots'):
+    #    os.mkdir('/home/ahaas/BachelorThesis/Plots')
+    #plt.savefig('/home/ahaas/BachelorThesis/Plots/prob_normal_1.svg')
 
 
-filepath = '/home/ahaas/BachelorThesis/distparams_probNN_normal_1'
-violon_per_hour(load_data(filepath))
+violon_per_hour(load_data(filepath), 'scale')

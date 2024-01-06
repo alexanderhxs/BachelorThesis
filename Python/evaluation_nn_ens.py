@@ -35,7 +35,7 @@ for num in range(num_runs):
         dist_file_list = sorted(os.listdir(file_path))
     except:
         if num_runs == 1:
-            file_path = f'/home/ahaas/BachelorThesis/distparams_leadNN_{distribution.lower()}_4'
+            file_path = f'/home/ahaas/BachelorThesis/distparams_singleNN_{distribution.lower()}_4'
         else:
             file_path = f'/home/ahaas/BachelorThesis/distparams_probNN_{distribution.lower()}_{num + 1}'
         dist_file_list = sorted(os.listdir(file_path))
