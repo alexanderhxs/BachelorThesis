@@ -17,7 +17,7 @@ plt.plot(range(1,25), plt_data.apply(np.mean), linewidth=1)
 plt.show()
 
 #load params
-filepath = '/home/ahaas/BachelorThesis/distparams_singleNN_normal4'
+filepath = '/home/ahaas/BachelorThesis/distparams_probNN_normal_4'
 #load data
 def load_data(filepath):
     dist_params = pd.DataFrame()
@@ -44,4 +44,4 @@ def violon_per_hour(dist_params, parameter):
     #plt.savefig('/home/ahaas/BachelorThesis/Plots/prob_normal_1.svg')
 
 
-violon_per_hour(load_data(filepath), 'scale')
+violon_per_hour(load_data(filepath), 'loc')

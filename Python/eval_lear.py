@@ -3,7 +3,7 @@ import os
 import numpy as np
 from datetime import datetime
 
-filelist = sorted(os.listdir(os.path.join('..', 'lear_forecasts')))
+filelist = sorted(os.listdir(os.path.join('/home/ahaas/BachelorThesis', 'lear_forecasts')))
 cal_lens = set([int(e.split('_')[0]) for e in filelist])
 cal_lens = sorted(list(cal_lens))
 cl_dfs = {}
@@ -11,7 +11,7 @@ for cl in cal_lens:
     singledfs = []
     subfilelist = [e for e in filelist if e.startswith(str(cl))]# [182:]
     for f in subfilelist:
-        temp = pd.read_csv(os.path.join('..', 'lear_forecasts', f), index_col=0)
+        temp = pd.read_csv(os.path.join('/home/ahaas/BachelorThesis', 'lear_forecasts', f), index_col=0)
         temp.index = [datetime.strptime(e, '%Y-%m-%d %H:%M:%S') for e in temp.index]
         singledfs.append(temp)
     

@@ -18,10 +18,11 @@ import json
 #     cty (currently only DE), default: DE
 #     distribution (Normal, StudentT, JSU, SinhArcsinh and NormalInverseGaussian), default: Normal
 
-print('\n\n')
+print('\n')
 print(sys.executable)
 
 distribution = 'JSU'
+trial = 3
 paramcount = {'Normal': 2,
               'StudentT': 3,
               'JSU': 4,
@@ -41,20 +42,20 @@ if len(sys.argv) > 2:
     distribution = sys.argv[2]
 
 if sys.executable != '/home/ahaas/.virtualenvs/BachelorThesis/bin/python':
-    if not os.path.exists(f'../forecasts_probNN_{distribution.lower()}'):
-        os.mkdir(f'../forecasts_probNN_{distribution.lower()}')
+    if not os.path.exists(f'../forecasts_probNN_{distribution.lower()}_{trial}'):
+        os.mkdir(f'../forecasts_probNN_{distribution.lower()}_{trial}')
 
-    if not os.path.exists(f'../distparams_probNN_{distribution.lower()}'):
-        os.mkdir(f'../distparams_probNN_{distribution.lower()}')
+    if not os.path.exists(f'../distparams_probNN_{distribution.lower()}_{trial}'):
+        os.mkdir(f'../distparams_probNN_{distribution.lower()}_{trial}')
 
     if not os.path.exists(f'../trialfiles'):
         os.mkdir(f'../trialfiles')
 else:
-    if not os.path.exists(f'/home/ahaas/BachelorThesis/forecasts_probNN_{distribution.lower()}'):
-        os.mkdir(f'/home/ahaas/BachelorThesis/forecasts_probNN_{distribution.lower()}')
+    if not os.path.exists(f'/home/ahaas/BachelorThesis/forecasts_probNN_{distribution.lower()}_{trial}'):
+        os.mkdir(f'/home/ahaas/BachelorThesis/forecasts_probNN_{distribution.lower()}_{trial}')
 
-    if not os.path.exists(f'/home/ahaas/BachelorThesis/distparams_probNN_{distribution.lower()}'):
-        os.mkdir(f'/home/ahaas/BachelorThesis/distparams_probNN_{distribution.lower()}')
+    if not os.path.exists(f'/home/ahaas/BachelorThesis/distparams_probNN_{distribution.lower()}_{trial}'):
+        os.mkdir(f'/home/ahaas/BachelorThesis/distparams_probNN_{distribution.lower()}_{trial}')
 
     if not os.path.exists(f'/home/ahaas/BachelorThesis/trialfiles'):
         os.mkdir(f'/home/ahaas/BachelorThesis/trialfiles')
@@ -263,14 +264,14 @@ def runoneday(inp):
         print(getters)
         params = {k: [float(e) for e in v.numpy()[0]] for k, v in getters.items()}
         print(params)
-        json.dump(params, open(os.path.join(f'../distparams_probNN_{distribution.lower()}', datetime.strftime(df.index[-24], '%Y-%m-%d')), 'w'))
+        json.dump(params, open(os.path.join(f'/home/ahaas/BachelorThesis/distparams_probNN_{distribution.lower()}_{trial}', datetime.strftime(df.index[-24], '%Y-%m-%d')), 'w'))
         pred = model.predict(np.tile(Xf, (10000, 1)))
         predDF = pd.DataFrame(index=df.index[-24:])
         predDF['real'] = df.loc[df.index[-24:], 'Price'].to_numpy()
         predDF['forecast'] = pd.NA
         predDF.loc[predDF.index[:], 'forecast'] = pred.mean(0)
-        predDF.to_csv(os.path.join('../forecasts', datetime.strftime(df.index[-24], '%Y-%m-%d')))
-        np.savetxt(os.path.join(f'../forecasts_probNN_{distribution.lower()}', datetime.strftime(df.index[-24], '%Y-%m-%d')), pred, delimiter=',', fmt='%.3f')
+        #predDF.to_csv(os.path.join('/home/ahaas/BachelorThesis/forecasts', datetime.strftime(df.index[-24], '%Y-%m-%d')))
+        np.savetxt(os.path.join(f'/home/ahaas/BachelorThesis/forecasts_probNN_{distribution.lower()}_{trial}', datetime.strftime(df.index[-24], '%Y-%m-%d')), pred, delimiter=',', fmt='%.3f')
     else:
         predDF = pd.DataFrame(index=df.index[-24:])
         predDF['real'] = df.loc[df.index[-24:], 'Price'].to_numpy()
@@ -283,7 +284,7 @@ def runoneday(inp):
 
 optuna.logging.get_logger('optuna').addHandler(logging.StreamHandler(sys.stdout))
 study_name = f'FINAL_DE_selection_prob_{distribution.lower()}' # 'on_new_data_no_feature_selection'
-storage_name = f'sqlite:////home/ahaas/BachelorThesis/trialfiles/{study_name}4'
+storage_name = f'sqlite:////home/ahaas/BachelorThesis/trialfiles/{study_name}{trial}'
 
 summaries = optuna.get_all_study_summaries(storage=storage_name)
 for summary in summaries:
@@ -304,6 +305,6 @@ print(len(inputlist))
 #for e in inputlist:
 #     _ = runoneday(e)
 print(os.cpu_count())
-if __name__ == '__main__':
-    with Pool(max(3, 1)) as p:
-        _ = p.map(runoneday, inputlist)
+#if __name__ == '__main__':
+with Pool(8) as p:
+    _ = p.map(runoneday, inputlist)

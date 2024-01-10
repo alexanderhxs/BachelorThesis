@@ -15,10 +15,10 @@ import copy
 paramcount = {'Normal': 2,
               'JSU': 4,
               'Point': None}
-distribution = 'JSU'
-trial = 4
+distribution = 'Normal'
+trial = 2
 
-filepath = f'/home/ahaas/BachelorThesis/distparams_singleNN_{distribution.lower()}{trial}'
+filepath = f'/home/ahaas/BachelorThesis/distparams_singleNN_{distribution.lower()}_{trial}'
 if not os.path.exists(filepath):
     os.mkdir(filepath)
 
@@ -60,9 +60,6 @@ for tm in range(24):
 
     # '''
     # input feature selection
-    colmask = [True] * 13
-
-    X = X[:, colmask]
     Xf = X[(1456*24):, :]
     X = X[(7 * 24):(1456*24), :]
     X = X[tm::24]
