@@ -14,7 +14,7 @@ except:
     data = pd.read_csv('/home/ahaas/BachelorThesis/Datasets/DE.csv', index_col=0)
 
 distribution = 'Normal'
-num_runs = 1
+num_runs = 4
 quantile_array = np.arange(0.01, 1, 0.01)
 
 def pinball_score(observed, pred_quantiles):
@@ -23,32 +23,41 @@ def pinball_score(observed, pred_quantiles):
     return scores.mean()
 
 param_dfs = []
+fc_dfs = []
 
 #load data
 for num in range(num_runs):
     try:
         if num_runs == 1:
-            file_path = f'../distparams_probNN_{distribution.lower()}_1'
+            file_path = f'../distparams_probNN_{distribution.lower()}_2'
         else:
             file_path = f'../distparams_probNN_{distribution.lower()}_{num+1}'
 
         dist_file_list = sorted(os.listdir(file_path))
     except:
         if num_runs == 1:
-            file_path = f'/home/ahaas/BachelorThesis/distparams_probNN2_{distribution.lower()}_1'
+            file_path = f'/home/ahaas/BachelorThesis/distparams_probNN_{distribution.lower()}_2'
+            file_path2 = f'/home/ahaas/BachelorThesis/forecasts_probNN_{distribution.lower()}_2'
         else:
             file_path = f'/home/ahaas/BachelorThesis/distparams_probNN_{distribution.lower()}_{num + 1}'
+            file_path2 = f'/home/ahaas/BachelorThesis/forecasts_probNN_{distribution.lower()}_{num + 1}'
         dist_file_list = sorted(os.listdir(file_path))
 
     dist_params = pd.DataFrame()
-    for file in dist_file_list:
+    fc = np.zeros((len(dist_file_list)*24, 10000))
+    for day, file in enumerate(dist_file_list):
         with open(os.path.join(file_path, file)) as f:
             fc_dict = json.load(f)
 
         fc_df = pd.DataFrame(fc_dict)
         fc_df.index = pd.date_range(pd.to_datetime(file), periods=len(fc_df), freq='H')
         dist_params = pd.concat([dist_params, fc_df])
+
+        fc_array = np.loadtxt(os.path.join(file_path2, file), delimiter=',')
+        fc[day*24:(day+1)*24] = np.transpose(fc_array)
+
     param_dfs.append(dist_params.add_suffix(f'_{num+1}'))
+    fc_dfs.append(fc)
 
 data.index = pd.to_datetime(data.index)
 
@@ -65,6 +74,19 @@ if distribution.lower() == 'normal':
         print('Observations: ' + str(len(y)) + '\n')
         print('MAE: ' + str(mae) + '\n' + 'RMSE: ' + str(rmse))
         print('CRPS: ' + str(np.mean(crps_observations)) + '\n\n')
+
+        #now with forecasted values:
+        means = np.mean(fc_dfs[num-1], axis=1)
+        medians = np.median(fc_dfs[num-1], axis=1)
+        quantiles = np.percentile(fc_dfs[num-1], quantile_array*100, axis=1)
+        crps_observations = [pinball_score(observed, quantiles_row) for observed, quantiles_row in zip(y, np.transpose(quantiles))]
+        mae = np.abs(y.values - medians).mean()
+        rmse = np.sqrt((y.values - means) ** 2).mean()
+        print(f'Run Nr {num} --- forecasted value based metrics')
+        print('Observations: ' + str(len(y)) + '\n')
+        print('MAE: ' + str(mae) + '\n' + 'RMSE: ' + str(rmse))
+        print('CRPS: ' + str(np.mean(crps_observations)) + '\n\n')
+
 
     #q-Ens averaging (horizontal) via parameter averaging
     all_df = param_dfs[0]

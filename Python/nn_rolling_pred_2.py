@@ -21,7 +21,7 @@ import json
 print('\n')
 print(sys.executable)
 
-distribution = 'JSU'
+distribution = 'Normal'
 trial = 1
 paramcount = {'Normal': 2,
               'StudentT': 3,
@@ -269,13 +269,13 @@ def runoneday(inp):
         for index, fc in enumerate(fc_list):
             json.dump(fc, open(os.path.join(f'/home/ahaas/BachelorThesis/distparams_probNN2_{distribution.lower()}_{trial}', datetime.strftime(df.index[24*(index - Xf.shape[0])], '%Y-%m-%d')), 'w'))
 
-        #pred = model.predict(np.tile(Xf, (10000, 1)))
-        #predDF = pd.DataFrame(index=df.index[-24:])
-        #predDF['real'] = df.loc[df.index[-24:], 'Price'].to_numpy()
-        #predDF['forecast'] = pd.NA
-        #predDF.loc[predDF.index[:], 'forecast'] = pred.mean(0)
+        pred = model.predict(np.tile(Xf, (10000, 1)))
+        predDF = pd.DataFrame(index=df.index[-24:])
+        predDF['real'] = df.loc[df.index[-24:], 'Price'].to_numpy()
+        predDF['forecast'] = pd.NA
+        predDF.loc[predDF.index[:], 'forecast'] = pred.mean(0)
         #predDF.to_csv(os.path.join('/home/ahaas/BachelorThesis/forecasts', datetime.strftime(df.index[-24], '%Y-%m-%d')))
-        #np.savetxt(os.path.join(f'/home/ahaas/BachelorThesis/forecasts_probNN2_{distribution.lower()}_{trial}', datetime.strftime(df.index[-24], '%Y-%m-%d')), pred, delimiter=',', fmt='%.3f')
+        np.savetxt(os.path.join(f'/home/ahaas/BachelorThesis/forecasts_probNN2_{distribution.lower()}_{trial}', datetime.strftime(df.index[-24], '%Y-%m-%d')), pred, delimiter=',', fmt='%.3f')
     else:
         predDF = pd.DataFrame(index=df.index[-24:])
         predDF['real'] = df.loc[df.index[-24:], 'Price'].to_numpy()

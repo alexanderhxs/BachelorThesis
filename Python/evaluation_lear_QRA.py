@@ -23,7 +23,7 @@ y = data.loc[fc_df.index]
 y = y.iloc[:, 0]
 crps_observations = fc_df.apply(lambda x: pinball_score(y[x.name], x), axis=1)
 median = fc_df.iloc[:, 49]
-mean = fc_df.apply(np.mean, axis = 1)
+mean = fc_df.apply(np.mean, axis=1)
 
 mae = np.abs(y - median).mean()
 rmse = np.sqrt(((y - mean) ** 2).mean())
