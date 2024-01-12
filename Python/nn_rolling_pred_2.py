@@ -22,7 +22,7 @@ print('\n')
 print(sys.executable)
 
 distribution = 'JSU'
-trial = 3
+trial = 1
 paramcount = {'Normal': 2,
               'StudentT': 3,
               'JSU': 4,
@@ -51,11 +51,11 @@ if sys.executable != '/home/ahaas/.virtualenvs/BachelorThesis/bin/python':
     if not os.path.exists(f'../trialfiles'):
         os.mkdir(f'../trialfiles')
 else:
-    if not os.path.exists(f'/home/ahaas/BachelorThesis/forecasts_probNN_{distribution.lower()}_{trial}'):
-        os.mkdir(f'/home/ahaas/BachelorThesis/forecasts_probNN_{distribution.lower()}_{trial}')
+    if not os.path.exists(f'/home/ahaas/BachelorThesis/forecasts_probNN2_{distribution.lower()}_{trial}'):
+        os.mkdir(f'/home/ahaas/BachelorThesis/forecasts_probNN2_{distribution.lower()}_{trial}')
 
-    if not os.path.exists(f'/home/ahaas/BachelorThesis/distparams_probNN_{distribution.lower()}_{trial}'):
-        os.mkdir(f'/home/ahaas/BachelorThesis/distparams_probNN_{distribution.lower()}_{trial}')
+    if not os.path.exists(f'/home/ahaas/BachelorThesis/distparams_probNN2_{distribution.lower()}_{trial}'):
+        os.mkdir(f'/home/ahaas/BachelorThesis/distparams_probNN2_{distribution.lower()}_{trial}')
 
     if not os.path.exists(f'/home/ahaas/BachelorThesis/trialfiles'):
         os.mkdir(f'/home/ahaas/BachelorThesis/trialfiles')
@@ -77,9 +77,10 @@ data.index = [datetime.strptime(e, '%Y-%m-%d %H:%M:%S') for e in data.index]
 # data = data.iloc[:4*364*24] # take the first 4 years - 1456 days
 
 def runoneday(inp):
-    params, dayno = inp
-    df = data.iloc[dayno*24:dayno*24+1456*24+24]
+    params, monthno = inp
+    df = data.iloc[monthno*24:monthno*24+(1456+28)*24]
     # prepare the input/output dataframes
+    fc_period = int((len(df)/24) - 1456)
     Y = np.zeros((1456, 24))
     # Yf = np.zeros((1, 24)) # no Yf for rolling prediction
     for d in range(1456):
@@ -87,8 +88,8 @@ def runoneday(inp):
     Y = Y[7:, :] # skip first 7 days
     # for d in range(1):
     #     Yf[d, :] = df.loc[df.index[(d+1092)*24:(d+1093)*24], 'Price'].to_numpy()
-    X = np.zeros((1456+1, INP_SIZE))
-    for d in range(7, 1456+1):
+    X = np.zeros((1456+fc_period, INP_SIZE))
+    for d in range(7, 1456+fc_period):
         X[d, :24] = df.loc[df.index[(d-1)*24:(d)*24], 'Price'].to_numpy() # D-1 price
         X[d, 24:48] = df.loc[df.index[(d-2)*24:(d-1)*24], 'Price'].to_numpy() # D-2 price
         X[d, 48:72] = df.loc[df.index[(d-3)*24:(d-2)*24], 'Price'].to_numpy() # D-3 price
@@ -104,7 +105,7 @@ def runoneday(inp):
         X[d, 219] = data.loc[data.index[(d-2)*24:(d-1)*24:24], data.columns[6]].to_numpy() # D-2 Brent oil
         X[d, 220] = data.index[d].weekday()
     # '''
-    # input feature selection
+    #input feature selection
     colmask = [False] * INP_SIZE
     if params['price_D-1']:
         colmask[:24] = [True] * 24
@@ -136,8 +137,8 @@ def runoneday(inp):
         colmask[220] = True
     X = X[:, colmask]
     # '''
-    Xf = X[-1:, :]
-    X = X[7:-1, :]
+    Xf = X[-fc_period:, :]
+    X = X[7:-fc_period, :]
     # begin building a model
     inputs = keras.Input(X.shape[1]) # <= INP_SIZE as some columns might have been turned off
     # batch normalization
@@ -262,16 +263,19 @@ def runoneday(inp):
             getters = {'loc': dist.loc, 'scale': dist.scale, 
                        'tailweight': dist.tailweight, 'skewness': dist.skewness}
         print(getters)
-        params = {k: [float(e) for e in v.numpy()[0]] for k, v in getters.items()}
-        print(params)
-        json.dump(params, open(os.path.join(f'/home/ahaas/BachelorThesis/distparams_probNN_{distribution.lower()}_{trial}', datetime.strftime(df.index[-24], '%Y-%m-%d')), 'w'))
-        pred = model.predict(np.tile(Xf, (10000, 1)))
-        predDF = pd.DataFrame(index=df.index[-24:])
-        predDF['real'] = df.loc[df.index[-24:], 'Price'].to_numpy()
-        predDF['forecast'] = pd.NA
-        predDF.loc[predDF.index[:], 'forecast'] = pred.mean(0)
+
+        fc_list = [{k: [float(e) for e in v.numpy()[day]] for k, v in getters.items()} for day in range(Xf.shape[0])]
+        print(fc_list)
+        for index, fc in enumerate(fc_list):
+            json.dump(fc, open(os.path.join(f'/home/ahaas/BachelorThesis/distparams_probNN2_{distribution.lower()}_{trial}', datetime.strftime(df.index[24*(index - Xf.shape[0])], '%Y-%m-%d')), 'w'))
+
+        #pred = model.predict(np.tile(Xf, (10000, 1)))
+        #predDF = pd.DataFrame(index=df.index[-24:])
+        #predDF['real'] = df.loc[df.index[-24:], 'Price'].to_numpy()
+        #predDF['forecast'] = pd.NA
+        #predDF.loc[predDF.index[:], 'forecast'] = pred.mean(0)
         #predDF.to_csv(os.path.join('/home/ahaas/BachelorThesis/forecasts', datetime.strftime(df.index[-24], '%Y-%m-%d')))
-        np.savetxt(os.path.join(f'/home/ahaas/BachelorThesis/forecasts_probNN_{distribution.lower()}_{trial}', datetime.strftime(df.index[-24], '%Y-%m-%d')), pred, delimiter=',', fmt='%.3f')
+        #np.savetxt(os.path.join(f'/home/ahaas/BachelorThesis/forecasts_probNN2_{distribution.lower()}_{trial}', datetime.strftime(df.index[-24], '%Y-%m-%d')), pred, delimiter=',', fmt='%.3f')
     else:
         predDF = pd.DataFrame(index=df.index[-24:])
         predDF['real'] = df.loc[df.index[-24:], 'Price'].to_numpy()
@@ -279,8 +283,7 @@ def runoneday(inp):
         predDF.loc[predDF.index[:], 'forecast'] = model.predict(Xf)[0]
         pred = model.predict(Xf)
         np.savetxt(os.path.join(f'../forecasts_probNN_{distribution.lower()}', datetime.strftime(df.index[-24], '%Y-%m-%d')), pred, delimiter=',', fmt='%.3f')
-    print(predDF)
-    return predDF
+        print(predDF)
 
 optuna.logging.get_logger('optuna').addHandler(logging.StreamHandler(sys.stdout))
 study_name = f'FINAL_DE_selection_prob_{distribution.lower()}' # 'on_new_data_no_feature_selection'
@@ -299,13 +302,15 @@ table_names = study.get_trials()
 best_params = study.best_params
 print(best_params)
 
-#inputList = [(best_params, day) for day in range(0, len(data) // 24 - 1456, 28)]
-inputlist = [(best_params, day) for day in range(len(data) // 24 - 1456)]
-print(len(inputlist))
+inputList = [(best_params, day) for day in range(0, len(data) // 24 - 1456, 28)]
+#inputlist = [(best_params, day) for day in range(len(data) // 24 - 1456)]
+print(len(inputList))
 
 #for e in inputlist:
 #     _ = runoneday(e)
 print(os.cpu_count())
 #if __name__ == '__main__':
 with Pool(8) as p:
-    _ = p.map(runoneday, inputlist)
+    _ = p.map(runoneday, inputList)
+#for list in reversed(inputList):
+#    runoneday(list)
