@@ -22,7 +22,7 @@ print('\n')
 print(sys.executable)
 
 distribution = 'Normal'
-trial = 1
+trial = 4
 paramcount = {'Normal': 2,
               'StudentT': 3,
               'JSU': 4,
@@ -51,11 +51,11 @@ if sys.executable != '/home/ahaas/.virtualenvs/BachelorThesis/bin/python':
     if not os.path.exists(f'../trialfiles'):
         os.mkdir(f'../trialfiles')
 else:
-    if not os.path.exists(f'/home/ahaas/BachelorThesis/forecasts_probNN2_{distribution.lower()}_{trial}'):
-        os.mkdir(f'/home/ahaas/BachelorThesis/forecasts_probNN2_{distribution.lower()}_{trial}')
+    if not os.path.exists(f'/home/ahaas/BachelorThesis/forecasts_probNN3_{distribution.lower()}_{trial}'):
+        os.mkdir(f'/home/ahaas/BachelorThesis/forecasts_probNN3_{distribution.lower()}_{trial}')
 
-    if not os.path.exists(f'/home/ahaas/BachelorThesis/distparams_probNN2_{distribution.lower()}_{trial}'):
-        os.mkdir(f'/home/ahaas/BachelorThesis/distparams_probNN2_{distribution.lower()}_{trial}')
+    if not os.path.exists(f'/home/ahaas/BachelorThesis/distparams_probNN3_{distribution.lower()}_{trial}'):
+        os.mkdir(f'/home/ahaas/BachelorThesis/distparams_probNN3_{distribution.lower()}_{trial}')
 
     if not os.path.exists(f'/home/ahaas/BachelorThesis/trialfiles'):
         os.mkdir(f'/home/ahaas/BachelorThesis/trialfiles')
@@ -77,8 +77,8 @@ data.index = [datetime.strptime(e, '%Y-%m-%d %H:%M:%S') for e in data.index]
 # data = data.iloc[:4*364*24] # take the first 4 years - 1456 days
 
 def runoneday(inp):
-    params, monthno = inp
-    df = data.iloc[monthno*24:monthno*24+(1456+28)*24]
+    params = inp
+    df = data
     # prepare the input/output dataframes
     fc_period = int((len(df)/24) - 1456)
     Y = np.zeros((1456, 24))
@@ -267,7 +267,7 @@ def runoneday(inp):
         fc_list = [{k: [float(e) for e in v.numpy()[day]] for k, v in getters.items()} for day in range(Xf.shape[0])]
         print(fc_list)
         for index, fc in enumerate(fc_list):
-            json.dump(fc, open(os.path.join(f'/home/ahaas/BachelorThesis/distparams_probNN2_{distribution.lower()}_{trial}', datetime.strftime(df.index[24*(index - Xf.shape[0])], '%Y-%m-%d')), 'w'))
+            json.dump(fc, open(os.path.join(f'/home/ahaas/BachelorThesis/distparams_probNN3_{distribution.lower()}_{trial}', datetime.strftime(df.index[24*(index - Xf.shape[0])], '%Y-%m-%d')), 'w'))
 
         pred = model.predict(np.tile(Xf, (10000, 1)))
         predDF = pd.DataFrame(index=df.index[-24:])
@@ -275,7 +275,7 @@ def runoneday(inp):
         predDF['forecast'] = pd.NA
         predDF.loc[predDF.index[:], 'forecast'] = pred.mean(0)
         #predDF.to_csv(os.path.join('/home/ahaas/BachelorThesis/forecasts', datetime.strftime(df.index[-24], '%Y-%m-%d')))
-        np.savetxt(os.path.join(f'/home/ahaas/BachelorThesis/forecasts_probNN2_{distribution.lower()}_{trial}', datetime.strftime(df.index[-24], '%Y-%m-%d')), pred, delimiter=',', fmt='%.3f')
+        np.savetxt(os.path.join(f'/home/ahaas/BachelorThesis/forecasts_probNN3_{distribution.lower()}_{trial}', datetime.strftime(df.index[-24], '%Y-%m-%d')), pred, delimiter=',', fmt='%.3f')
     else:
         predDF = pd.DataFrame(index=df.index[-24:])
         predDF['real'] = df.loc[df.index[-24:], 'Price'].to_numpy()
@@ -303,14 +303,15 @@ best_params = study.best_params
 print(best_params)
 
 inputList = [(best_params, day) for day in range(0, len(data) // 24 - 1456, 28)]
+inputList = inputList[-180:]
 #inputlist = [(best_params, day) for day in range(len(data) // 24 - 1456)]
 print(len(inputList))
 
-#for e in inputlist:
-#     _ = runoneday(e)
 print(os.cpu_count())
-#if __name__ == '__main__':
-with Pool(8) as p:
-    _ = p.map(runoneday, inputList)
+
+#with Pool(8) as p:
+#    _ = p.map(runoneday, inputList)
 #for list in reversed(inputList):
 #    runoneday(list)
+
+runoneday(best_params)

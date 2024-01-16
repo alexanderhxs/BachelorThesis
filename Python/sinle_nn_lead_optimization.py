@@ -10,51 +10,17 @@ import sys
 import os
 from multiprocessing import Pool
 import json
-import copy
+import optuna
+import logging
 
 paramcount = {'Normal': 2,
               'JSU': 4,
               'Point': None}
 distribution = 'Normal'
-trial = 1
 
-filepath = f'/home/ahaas/BachelorThesis/distparams_singleNN_{distribution.lower()}_{trial}'
+filepath = f'/home/ahaas/BachelorThesis/trials_singleNN_{distribution.lower()}_2'
 if not os.path.exists(filepath):
     os.mkdir(filepath)
-
-#load hyperparameter
-with open(f'/home/ahaas/BachelorThesis/params_trial_{distribution}{trial}.json', 'r') as j:
-    params = json.load(j)
-'''
-params = {'Coal': False,
-          'Dummy': True,
-          'EUA': False,
-          'Gas': True,
-          'Oil': True,
-          'RES_D': True,
-          'RES_D-1': True,
-          'activation_1': 'softmax',
-          'activation_2': 'elu',
-          'dropout': False,
-          'learning_rate': 0.000281493495779889,
-          'load_D': True,
-          'load_D-1': False,
-          'load_D-7': True,
-          'neurons_1': 50,
-          'neurons_2': 50,
-          'price_D-1': True,
-          'price_D-2': False,
-          'price_D-3': False,
-          'price_D-7': False,
-          'regularize_h1_activation': False,
-          'regularize_h1_kernel': False,
-          'regularize_h2_activation': False,
-          'regularize_h2_kernel': False,
-          'regularize_loc': False,
-          'regularize_scale': False,
-          'regularize_skewness': False,
-          'regularize_tailweight': False}
-          '''
 
 #load data
 try:
@@ -62,19 +28,19 @@ try:
 except:
     data = pd.read_csv('/home/ahaas/BachelorThesis/Datasets/DE.csv', index_col=0)
 
+binopt = [True, False]
+activations = ['relu', 'elu', 'softplus']
+
+#initialization of fcs
 fcs = []
 df = data.iloc[:, :]
 fc_index = pd.to_datetime(df.iloc[(1456*24):].index, format='%Y-%m-%d %H:%M:%S')
 fc_index = fc_index[::24]
 #train models
-for tm in range(24):
-    #load params:
-    #with open(f'/home/ahaas/BachelorThesis/trials_singleNN_normal_2/trial_model_{tm}', 'r') as j:
-    #    params = json.load(j)
-    #    print(params)
-
+def objective(trial, tm):
     # prepare the input/output dataframes
     Y = df.iloc[:, 0].to_numpy()
+    Yf = Y[(1456*24)+tm::24]
     Y = Y[(7 * 24)+tm:(1456*24):24]  # skip first 7 days
 
     X = np.zeros((len(df), 13))
@@ -93,48 +59,75 @@ for tm in range(24):
         X[d, 11] = df.iloc[(d - 2 * 24), 5]  # D-2 TTF_Gas
         X[d, 12] = df.iloc[(d - 2 * 24), 6]  # D-2 Brent oil
 
-    # '''
-    # input feature selection
+    #inputfeature selection
+    colmask = [False]*13
+    if trial.suggest_categorical('price_D-1', [True]):
+        colmask[0] = True
+    if trial.suggest_categorical('price_D-2', binopt):
+        colmask[1] = True
+    if trial.suggest_categorical('price_D-3', [True]):
+        colmask[2] = True
+    if trial.suggest_categorical('price_D-7', [True]):
+        colmask[3] = True
+    if trial.suggest_categorical('load_D', [True]):
+        colmask[4] = True
+    if trial.suggest_categorical('load_D-1', binopt):
+        colmask[5] = True
+    if trial.suggest_categorical('load_D-7', [False]):
+        colmask[6] = True
+    if trial.suggest_categorical('RES_D', [True]):
+        colmask[7] = True
+    if trial.suggest_categorical('RES_D-1', [True]):
+        colmask[8] = True
+    if trial.suggest_categorical('EUA', binopt):
+        colmask[9] = True
+    if trial.suggest_categorical('Coal', binopt):
+        colmask[10] = True
+    if trial.suggest_categorical('Gas', binopt):
+        colmask[11] = True
+    if trial.suggest_categorical('Oil', binopt):
+        colmask[12] = True
+    X = X[:, colmask]
     Xf = X[(1456*24):, :]
     X = X[(7 * 24):(1456*24), :]
     X = X[tm::24]
     Xf = Xf[tm::24]
+
 
     inputs = keras.Input(X.shape[1])
     # batch normalization
     norm = keras.layers.BatchNormalization()(inputs)
     last_layer = norm
 
-    dropout = params['dropout'] # trial.suggest_categorical('dropout', [True, False])
-    if dropout:
-        rate = params['dropout_rate'] # trial.suggest_float('dropout_rate', 0, 1)
+    if trial.suggest_categorical('dropout', [False]):
+        rate = trial.suggest_float('dropout_rate', 0, 1) # trial.suggest_float('dropout_rate', 0, 1)
         drop = keras.layers.Dropout(rate)(last_layer)
         last_layer = drop
 
     # regularization of 1st hidden layer,
-    regularize_h1_activation = params['regularize_h1_activation']
-    regularize_h1_kernel = params['regularize_h1_kernel']
+    regularize_h1_activation = trial.suggest_categorical('regularize_h1_activation',binopt)
+    regularize_h1_kernel = trial.suggest_categorical('regularize_h1_kernel', binopt)
     h1_activation_rate = (0.0 if not regularize_h1_activation
-                          else params['h1_activation_rate_l1'])
+                          else trial.suggest_float('h1_activation_rate_l1', 1e-5, 1e1, log=True))
     h1_kernel_rate = (0.0 if not regularize_h1_kernel
-                      else params['h1_activation_rate_l1'])
+                      else trial.suggest_float('h1_activation_rate_l1', 1e-5, 1e1, log=True))
     # define 1st hidden layer with regularization
-    hidden = keras.layers.Dense(params['neurons_1'],
-                                activation=params['activation_1'],
+    hidden = keras.layers.Dense(trial.suggest_int('neurons_1', 32, 200, log=False),
+                                activation=trial.suggest_categorical('activation_1', activations),
                                 # kernel_initializer='ones',
                                 kernel_regularizer=keras.regularizers.L1(h1_kernel_rate),
                                 activity_regularizer=keras.regularizers.L1(h1_activation_rate))(last_layer)
     # regularization of 2nd hidden layer,
     #activation - output, kernel - weights/parameters of input
-    regularize_h2_activation = params['regularize_h2_activation']
-    regularize_h2_kernel = params['regularize_h2_kernel']
+    regularize_h2_activation = trial.suggest_categorical('regularize_h2_activation', binopt)
+    regularize_h2_kernel = trial.suggest_categorical('regularize_h2_kernel', binopt)
     h2_activation_rate = (0.0 if not regularize_h2_activation
-                          else params['h2_activation_rate_l1'])
+                          else trial.suggest_float('h2_activation_rate_l1', 1e-5, 1e1, log=True))
     h2_kernel_rate = (0.0 if not regularize_h2_kernel
-                      else params['h2_kernel_rate_l1'])
+                      else trial.suggest_float('h2_kernel_rate_l1', 1e-5, 1e1, log=True))
     # define 2nd hidden layer with regularization
-    hidden = keras.layers.Dense(params['neurons_2'],
-                                activation=params['activation_2'],
+    hidden = keras.layers.Dense(trial.suggest_int('neurons_2', 32 , 200, log=False),
+                                activation=trial.suggest_categorical('activation_2', activations),
                                 # kernel_initializer='ones',
                                 kernel_regularizer=keras.regularizers.L1(h2_kernel_rate),
                                 activity_regularizer=keras.regularizers.L1(h2_activation_rate))(hidden)
@@ -143,9 +136,9 @@ for tm in range(24):
     param_layers = []
     param_names = ["loc", "scale", "tailweight", "skewness"]
     for p in range(paramcount[distribution]):
-        regularize_param_kernel = params['regularize_'+param_names[p]]
+        regularize_param_kernel = trial.suggest_categorical('regularize_'+param_names[p], binopt)
         param_kernel_rate = (0.0 if not regularize_param_kernel
-                             else params[str(param_names[p])+'_rate_l1'])
+                             else trial.suggest_float(param_names[p]+'_rate_l1', 1e-5, 1e1, log=True))
         param_layers.append(keras.layers.Dense(
             1, activation='linear', # kernel_initializer='ones',
             kernel_regularizer=keras.regularizers.L1(param_kernel_rate))(hidden))
@@ -168,43 +161,20 @@ for tm in range(24):
     else:
         raise ValueError(f'Incorrect distribution {distribution}')
     model = keras.Model(inputs=inputs, outputs=outputs)
-    model.compile(optimizer=keras.optimizers.Adam(params['learning_rate']),
+    model.compile(optimizer=keras.optimizers.Adam(trial.suggest_float('learning_rate', 1e-5, 1e-1, log=True)),
                   loss=lambda y, rv_y: -rv_y.log_prob(y),
                   metrics='mae')
 
     callbacks = [keras.callbacks.EarlyStopping(patience=50, restore_best_weights=True)]
-    perm = np.random.permutation(np.arange(X.shape[0]))
-    VAL_DATA = .2
-    trainsubset = perm[:int((1 - VAL_DATA) * len(perm))]
-    valsubset = perm[int((1 - VAL_DATA) * len(perm)):]
-    model.fit(X[trainsubset], Y[trainsubset], epochs=1500, validation_data=(X[valsubset], Y[valsubset]),
-              callbacks=callbacks, batch_size=32, verbose=False)
+    model.fit(X, Y, epochs=1500, validation_data=(Xf, Yf), callbacks=[optuna.integration.KerasPruningCallback(trial, 'val_loss'), callbacks], batch_size=32, verbose=True)
+    metrics = model.evaluate(Xf, Yf)
+    return metrics[0]
 
-    dist = model(Xf)
-    if distribution == 'Normal':
-        getters = {'loc': dist.loc, 'scale': dist.scale}
-    elif distribution in {'JSU', 'SinhArcsinh', 'NormalInverseGaussian'}:
-        getters = {'loc': dist.loc, 'scale': dist.scale,
-                   'tailweight': dist.tailweight, 'skewness': dist.skewness}
-    fc = {k: v.numpy().tolist() for k, v in getters.items()}
-    print(fc)
-    fcs.append(fc)
-
-#realigning forecasts, for daily predictions
-fc_dict = {}
-for param in fcs[0]:
-    fc_dict[param] = [0]*24
-
-len_fcs = len(list(fcs[0].values())[0])
-fc_list = [copy.deepcopy(fc_dict) for _ in range(len_fcs)]
-
-for hour, fc in enumerate(fcs):
-    for day in range(len_fcs):
-        for param, values in fc.items():
-            fc_list[day][param][hour] = values[day]
-
-#safing forecasts
-for fc, date in zip(fc_list, fc_index):
-    fc_data = os.path.join(filepath, datetime.strftime(date, '%Y-%m-%d'))
-    with open(fc_data, 'w') as writer:
-        json.dump(fc, writer)
+optuna.logging.get_logger('optuna').addHandler(logging.StreamHandler(sys.stdout))
+for model in range(24):
+    study_name = f'trial_model_{model}'
+    study = optuna.create_study(study_name=study_name, sampler=optuna.samplers.TPESampler())
+    study.optimize(lambda trial: objective(trial, model), n_trials=32, n_jobs=8)
+    print(study.best_params)
+    with open(os.path.join(filepath, study_name), 'w') as j:
+        json.dump(study.best_params, j)

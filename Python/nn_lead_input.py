@@ -12,7 +12,7 @@ from multiprocessing import Pool
 import json
 
 distribution = 'Normal'
-trial = 4
+trial = 3
 
 paramcount = {'Normal': 2,
               'JSU': 4,
@@ -94,19 +94,16 @@ def runoneday(inp):
         colmask[12] = True
     if params['Dummy']:
         colmask[13] = True
+
     colmask[14] = True
     X = X[:, colmask]
     Xf = X[-24:, :]
     X = X[(7*24):-24, :]
 
-    inputs = keras.Input(X.shape[1])  # <= INP_SIZE as some columns might have been turned off
-    # batch normalization
-    batchnorm = True  # params['batch_normalization'] # trial.suggest_categorical('batch_normalization', [True, False])
-    if batchnorm:
-        norm = keras.layers.BatchNormalization()(inputs)
-        last_layer = norm
-    else:
-        last_layer = inputs
+    inputs = keras.Input(X.shape[1])
+    last_layer = keras.layers.BatchNormalization()(inputs)
+
+
     # dropout
     dropout = params['dropout']  # trial.suggest_categorical('dropout', [True, False])
     if dropout:
@@ -182,11 +179,12 @@ def runoneday(inp):
                       metrics='mae')
 
     #cutting down X to safe fitting time
-    cutter = X.shape[0] * np.random.random_sample(1456-7)
-    X = X[cutter.astype(int), :]
-
+    #cutter = X.shape[0] * np.random.random_sample(1456-7)
+    #X = X[cutter.astype(int), :]
+    X = X[-1500:, :]
+    Y = Y[-1500:]
     callbacks = [keras.callbacks.EarlyStopping(patience=50, restore_best_weights=True)]
-    perm = np.random.permutation(np.arange(X.shape[0]))
+    perm = np.random.permutation(np.arange(1500))
     VAL_DATA = .2
     trainsubset = perm[:int((1 - VAL_DATA) * len(perm))]
     valsubset = perm[int((1 - VAL_DATA) * len(perm)):]
@@ -206,5 +204,8 @@ def runoneday(inp):
             json.dump(params, j)
 
 inputlist = [(params, day) for day in range(len(data) // 24 - 1456)]
+inputlist = inputlist[-180:]
 with Pool(8) as p:
     _ = p.map(runoneday, inputlist)
+#for list in inputlist:
+#    runoneday(list)

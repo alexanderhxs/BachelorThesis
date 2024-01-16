@@ -13,7 +13,7 @@ try:
 except:
     data = pd.read_csv('/home/ahaas/BachelorThesis/Datasets/DE.csv', index_col=0)
 
-distribution = 'Normal'
+distribution = 'JSU'
 num_runs = 4
 quantile_array = np.arange(0.01, 1, 0.01)
 
@@ -23,7 +23,6 @@ def pinball_score(observed, pred_quantiles):
     return scores.mean()
 
 param_dfs = []
-fc_dfs = []
 
 #load data
 for num in range(num_runs):
@@ -36,15 +35,13 @@ for num in range(num_runs):
         dist_file_list = sorted(os.listdir(file_path))
     except:
         if num_runs == 1:
-            file_path = f'/home/ahaas/BachelorThesis/distparams_probNN_{distribution.lower()}_2'
-            file_path2 = f'/home/ahaas/BachelorThesis/forecasts_probNN_{distribution.lower()}_2'
+            file_path = f'/home/ahaas/BachelorThesis/distparams_singleNN_{distribution.lower()}_HP2'
         else:
-            file_path = f'/home/ahaas/BachelorThesis/distparams_probNN_{distribution.lower()}_{num + 1}'
-            file_path2 = f'/home/ahaas/BachelorThesis/forecasts_probNN_{distribution.lower()}_{num + 1}'
+            file_path = f'/home/ahaas/BachelorThesis/distparams_singleNN_{distribution.lower()}_{num + 1}'
         dist_file_list = sorted(os.listdir(file_path))
+        print(file_path)
 
     dist_params = pd.DataFrame()
-    fc = np.zeros((len(dist_file_list)*24, 10000))
     for day, file in enumerate(dist_file_list):
         with open(os.path.join(file_path, file)) as f:
             fc_dict = json.load(f)
@@ -53,12 +50,15 @@ for num in range(num_runs):
         fc_df.index = pd.date_range(pd.to_datetime(file), periods=len(fc_df), freq='H')
         dist_params = pd.concat([dist_params, fc_df])
 
-        fc_array = np.loadtxt(os.path.join(file_path2, file), delimiter=',')
-        fc[day*24:(day+1)*24] = np.transpose(fc_array)
-
     param_dfs.append(dist_params.add_suffix(f'_{num+1}'))
-    fc_dfs.append(fc)
 
+#apply mask, to eliminate outliers
+no_outlier_dfs = []
+for param_df in param_dfs:
+    mask = param_df.index.hour == 25
+    param_df = param_df[~mask]
+    no_outlier_dfs.append(param_df)
+param_dfs = no_outlier_dfs
 data.index = pd.to_datetime(data.index)
 
 if distribution.lower() == 'normal':
@@ -71,18 +71,6 @@ if distribution.lower() == 'normal':
         mae = np.abs(y.values - median_series).mean()
         rmse = np.sqrt((y.values - df[f'loc_{num}']) ** 2).mean()
         print(f'Run Nr {num}')
-        print('Observations: ' + str(len(y)) + '\n')
-        print('MAE: ' + str(mae) + '\n' + 'RMSE: ' + str(rmse))
-        print('CRPS: ' + str(np.mean(crps_observations)) + '\n\n')
-
-        #now with forecasted values:
-        means = np.mean(fc_dfs[num-1], axis=1)
-        medians = np.median(fc_dfs[num-1], axis=1)
-        quantiles = np.percentile(fc_dfs[num-1], quantile_array*100, axis=1)
-        crps_observations = [pinball_score(observed, quantiles_row) for observed, quantiles_row in zip(y, np.transpose(quantiles))]
-        mae = np.abs(y.values - medians).mean()
-        rmse = np.sqrt((y.values - means) ** 2).mean()
-        print(f'Run Nr {num} --- forecasted value based metrics')
         print('Observations: ' + str(len(y)) + '\n')
         print('MAE: ' + str(mae) + '\n' + 'RMSE: ' + str(rmse))
         print('CRPS: ' + str(np.mean(crps_observations)) + '\n\n')

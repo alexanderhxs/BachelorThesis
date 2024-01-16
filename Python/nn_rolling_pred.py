@@ -22,7 +22,7 @@ print('\n')
 print(sys.executable)
 
 distribution = 'JSU'
-trial = 3
+trial = 2
 paramcount = {'Normal': 2,
               'StudentT': 3,
               'JSU': 4,
