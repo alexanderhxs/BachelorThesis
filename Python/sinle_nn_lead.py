@@ -16,9 +16,9 @@ paramcount = {'Normal': 2,
               'JSU': 4,
               'Point': None}
 distribution = 'Normal'
-trial = 1
+trial = 3
 
-filepath = f'/home/ahaas/BachelorThesis/distparams_singleNN_{distribution.lower()}_{trial}'
+filepath = f'/home/ahaas/BachelorThesis/distparams_singleNN_{distribution.lower()}_HP1'
 if not os.path.exists(filepath):
     os.mkdir(filepath)
 
@@ -119,7 +119,7 @@ for tm in range(24):
     h1_kernel_rate = (0.0 if not regularize_h1_kernel
                       else params['h1_activation_rate_l1'])
     # define 1st hidden layer with regularization
-    hidden = keras.layers.Dense(params['neurons_1'],
+    hidden = keras.layers.Dense(100,
                                 activation=params['activation_1'],
                                 # kernel_initializer='ones',
                                 kernel_regularizer=keras.regularizers.L1(h1_kernel_rate),
@@ -133,7 +133,7 @@ for tm in range(24):
     h2_kernel_rate = (0.0 if not regularize_h2_kernel
                       else params['h2_kernel_rate_l1'])
     # define 2nd hidden layer with regularization
-    hidden = keras.layers.Dense(params['neurons_2'],
+    hidden = keras.layers.Dense(100,
                                 activation=params['activation_2'],
                                 # kernel_initializer='ones',
                                 kernel_regularizer=keras.regularizers.L1(h2_kernel_rate),

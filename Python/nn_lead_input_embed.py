@@ -12,7 +12,7 @@ from multiprocessing import Pool
 import json
 
 distribution = 'Normal'
-trial = 3
+trial = 4
 
 paramcount = {'Normal': 2,
               'JSU': 4,
@@ -36,8 +36,8 @@ except:
 data.index = [datetime.strptime(e, '%Y-%m-%d %H:%M:%S') for e in data.index]
 
 #create directory
-if not os.path.exists(f'{folder}/distparams_leadNN_{distribution.lower()}_{trial}'):
-    os.mkdir(f'{folder}/distparams_leadNN_{distribution.lower()}_{trial}')
+if not os.path.exists(f'{folder}/distparams_leadEmbNN_{distribution.lower()}_{trial}'):
+    os.mkdir(f'{folder}/distparams_leadEmbNN_{distribution.lower()}_{trial}')
 
 def runoneday(inp):
     params, dayno = inp
@@ -94,14 +94,20 @@ def runoneday(inp):
         colmask[12] = True
     if params['Dummy']:
         colmask[13] = True
-    colmask[14] = True #lead time
+
+    colmask[14] = True
     X = X[:, colmask]
     Xf = X[-24:, :]
     X = X[(7*24):-24, :]
 
-    inputs = keras.Input(X.shape[1])
-    last_layer = keras.layers.BatchNormalization()(inputs)
+    var_inputs = keras.Input(X.shape[1]-1, name='var_input')
+    #var_inputs = keras.layers.BatchNormalization()(var_inputs)
 
+    emb_input = keras.Input(1, name='emb_input')
+    lead_emb = keras.layers.Embedding(input_dim=24, output_dim=1, input_length=1)(emb_input)
+    lead_emb = keras.layers.Flatten()(lead_emb)
+
+    last_layer = keras.layers.concatenate([var_inputs, lead_emb])
 
     # dropout
     dropout = params['dropout']  # trial.suggest_categorical('dropout', [True, False])
@@ -172,7 +178,7 @@ def runoneday(inp):
                     skewness=t[..., 3]))(linear)
         else:
             raise ValueError(f'Incorrect distribution {distribution}')
-        model = keras.Model(inputs=inputs, outputs=outputs)
+        model = keras.Model(inputs=[var_inputs, emb_input], outputs=outputs)
         model.compile(optimizer=keras.optimizers.Adam(params['learning_rate']),
                       loss=lambda y, rv_y: -rv_y.log_prob(y),
                       metrics='mae')
@@ -180,17 +186,29 @@ def runoneday(inp):
     #cutting down X to safe fitting time
     #cutter = X.shape[0] * np.random.random_sample(1456-7)
     #X = X[cutter.astype(int), :]
-    X = X[-1500:, :]
-    Y = Y[-1500:]
+    X = X[-15000:, :]
+    Y = Y[-15000:]
     callbacks = [keras.callbacks.EarlyStopping(patience=50, restore_best_weights=True)]
-    perm = np.random.permutation(np.arange(1500))
+    perm = np.random.permutation(np.arange(X.shape[0]))
     VAL_DATA = .2
     trainsubset = perm[:int((1 - VAL_DATA) * len(perm))]
     valsubset = perm[int((1 - VAL_DATA) * len(perm)):]
-    model.fit(X[trainsubset], Y[trainsubset], epochs=1500, validation_data=(X[valsubset], Y[valsubset]),
+
+    X_train = X[trainsubset]
+    X_val = X[valsubset]
+    Y_train = Y[trainsubset]
+    Y_val = Y[valsubset]
+
+    X_train = {'var_input': X_train[:, :-1],
+               'emb_input': X_train[:, -1].astype(int)}
+    X_val = {'var_input': X_val[:, :-1],
+               'emb_input': X_val[:, -1].astype(int)}
+    model.fit(X_train, Y_train, epochs=1500, validation_data=(X_val, Y_val),
               callbacks=callbacks, batch_size=32, verbose=False)
 
     if paramcount[distribution] is not None:
+        Xf = {'var_input': Xf[:, :-1],
+              'emb_input': Xf[:, -1].astype(int)}
         dist = model(Xf)
         if distribution == 'Normal':
             getters = {'loc': dist.loc, 'scale': dist.scale}
@@ -203,8 +221,7 @@ def runoneday(inp):
             json.dump(params, j)
 
 inputlist = [(params, day) for day in range(len(data) // 24 - 1456)]
-
-with Pool(8) as p:
-    _ = p.map(runoneday, inputlist)
-#for list in inputlist:
-#    runoneday(list)
+#with Pool(8) as p:
+#    _ = p.map(runoneday, inputlist)
+for list in inputlist:
+    runoneday(list)

@@ -8,8 +8,8 @@ distribution = 'Normal'
 
 params_list = []
 
-for file in sorted(os.listdir(f'/home/ahaas/BachelorThesis/trials_singleNN_{distribution.lower()}')):
-    with open(os.path.join(f'/home/ahaas/BachelorThesis/trials_singleNN_{distribution.lower()}', file), 'r') as j:
+for file in sorted(os.listdir(f'/home/ahaas/BachelorThesis/trials_singleNN_{distribution.lower()}_2')):
+    with open(os.path.join(f'/home/ahaas/BachelorThesis/trials_singleNN_{distribution.lower()}_2', file), 'r') as j:
         params = json.load(j)
         params_list.append(params)
 df = pd.DataFrame(params_list)
