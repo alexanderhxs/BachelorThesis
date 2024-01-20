@@ -17,7 +17,7 @@ plt.plot(range(1,25), plt_data.apply(np.mean), linewidth=1)
 plt.show()
 
 #load params
-filepath = '/home/ahaas/BachelorThesis/distparams_singleNN_normal_HP2'
+filepath = '/home/ahaas/BachelorThesis/distparams_leadNN_normal_4'
 #load data
 def load_data(filepath):
     dist_params = pd.DataFrame()

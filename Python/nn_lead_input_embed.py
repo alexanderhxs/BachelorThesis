@@ -101,7 +101,7 @@ def runoneday(inp):
     X = X[(7*24):-24, :]
 
     var_inputs = keras.Input(X.shape[1]-1, name='var_input')
-    #var_inputs = keras.layers.BatchNormalization()(var_inputs)
+    var_inputs = keras.layers.BatchNormalization()(var_inputs)
 
     emb_input = keras.Input(1, name='emb_input')
     lead_emb = keras.layers.Embedding(input_dim=24, output_dim=1, input_length=1)(emb_input)
@@ -186,8 +186,8 @@ def runoneday(inp):
     #cutting down X to safe fitting time
     #cutter = X.shape[0] * np.random.random_sample(1456-7)
     #X = X[cutter.astype(int), :]
-    X = X[-15000:, :]
-    Y = Y[-15000:]
+    X = X[-1500:, :]
+    Y = Y[-1500:]
     callbacks = [keras.callbacks.EarlyStopping(patience=50, restore_best_weights=True)]
     perm = np.random.permutation(np.arange(X.shape[0]))
     VAL_DATA = .2
@@ -199,15 +199,15 @@ def runoneday(inp):
     Y_train = Y[trainsubset]
     Y_val = Y[valsubset]
 
-    X_train = {'var_input': X_train[:, :-1],
+    X_train = {'input_1': X_train[:, :-1],
                'emb_input': X_train[:, -1].astype(int)}
-    X_val = {'var_input': X_val[:, :-1],
+    X_val = {'input_1': X_val[:, :-1],
                'emb_input': X_val[:, -1].astype(int)}
     model.fit(X_train, Y_train, epochs=1500, validation_data=(X_val, Y_val),
               callbacks=callbacks, batch_size=32, verbose=False)
 
     if paramcount[distribution] is not None:
-        Xf = {'var_input': Xf[:, :-1],
+        Xf = {'input_1': Xf[:, :-1],
               'emb_input': Xf[:, -1].astype(int)}
         dist = model(Xf)
         if distribution == 'Normal':

@@ -12,8 +12,8 @@ from multiprocessing import Pool
 import json
 
 distribution = 'Normal'
-trial = 3
-
+trial = 4
+print(f'Distribution: {distribution} \nTrial: {trial}')
 paramcount = {'Normal': 2,
               'JSU': 4,
               'Point': None}
@@ -38,16 +38,16 @@ data.index = [datetime.strptime(e, '%Y-%m-%d %H:%M:%S') for e in data.index]
 #create directory
 if not os.path.exists(f'{folder}/distparams_leadNN_{distribution.lower()}_{trial}'):
     os.mkdir(f'{folder}/distparams_leadNN_{distribution.lower()}_{trial}')
-
+print(f'Directory: {folder}/distparams_leadNN_{distribution.lower()}_{trial}')
 def runoneday(inp):
     params, dayno = inp
     df = data.iloc[dayno*24:dayno*24+1456*24+24]
     # prepare the input/output dataframes
     Y = df.iloc[:, 0].to_numpy()
-    Y = Y[7*24:-24] # skip first 7 days
-
-    X = np.zeros(((1456+1)*24, 15))
-    for d in range(7*24, (1456*24)+24):
+    Y = Y[7*24:(1456*24)] # skip first 7 days
+    fc_period = int(24)
+    X = np.zeros(((1456*24) + fc_period, 15))
+    for d in range(7*24, (1456*24) + fc_period):
         X[d, 0] = df.iloc[(d-1*24), 0] # D-1 price
         X[d, 1] = df.iloc[(d-2*24), 0] # D-2 price
         X[d, 2] = df.iloc[(d-3*24), 0] # D-3 price
@@ -94,10 +94,11 @@ def runoneday(inp):
         colmask[12] = True
     if params['Dummy']:
         colmask[13] = True
-    colmask[14] = True #lead time
+
+    colmask[14] = True
     X = X[:, colmask]
-    Xf = X[-24:, :]
-    X = X[(7*24):-24, :]
+    Xf = X[-fc_period:, :]
+    X = X[(7*24):-fc_period, :]
 
     inputs = keras.Input(X.shape[1])
     last_layer = keras.layers.BatchNormalization()(inputs)
@@ -183,7 +184,7 @@ def runoneday(inp):
     X = X[-1500:, :]
     Y = Y[-1500:]
     callbacks = [keras.callbacks.EarlyStopping(patience=50, restore_best_weights=True)]
-    perm = np.random.permutation(np.arange(1500))
+    perm = np.random.permutation(np.arange(X.shape[0]))
     VAL_DATA = .2
     trainsubset = perm[:int((1 - VAL_DATA) * len(perm))]
     valsubset = perm[int((1 - VAL_DATA) * len(perm)):]
@@ -201,10 +202,23 @@ def runoneday(inp):
         print(params)
         with open(os.path.join(f'{folder}/distparams_leadNN_{distribution.lower()}_{trial}', datetime.strftime(df.index[-24], '%Y-%m-%d')),'w') as j:
             json.dump(params, j)
+        #fc_list = [{k: v.numpy().tolist()[day*24:(day+1)*24] for k, v in getters.items()} for day in range(Xf.shape[0]//24)]
+        #print(fc_list)
+
+        #for index, fc in enumerate(fc_list):
+        #    json.dump(fc, open(os.path.join(f'{folder}/distparams_leadNN2_{distribution.lower()}_{trial}', datetime.strftime(df.index[24*(index - Xf.shape[0]//24)], '%Y-%m-%d')), 'w'))
 
 inputlist = [(params, day) for day in range(len(data) // 24 - 1456)]
 
+start_time = datetime.now()
+print(f'Program started at {start_time.strftime("%Y-%m-%d %H:%M:%S")}')
 with Pool(8) as p:
     _ = p.map(runoneday, inputlist)
 #for list in inputlist:
 #    runoneday(list)
+
+#runoneday(inputlist[0])
+
+end_time = datetime.now()
+compute_time = (end_time - start_time).total_seconds()
+print(f'Program ended at {end_time.strftime("%Y-%m-%d %H:%M:%S")} \n computation time: {str(timedelta(seconds=compute_time))}')

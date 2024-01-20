@@ -14,7 +14,7 @@ except:
     data = pd.read_csv('/home/ahaas/BachelorThesis/Datasets/DE.csv', index_col=0)
 
 distribution = 'Normal'
-num_runs = 1
+num_runs = 4
 quantile_array = np.arange(0.01, 1, 0.01)
 
 def pinball_score(observed, pred_quantiles):
@@ -35,9 +35,9 @@ for num in range(num_runs):
         dist_file_list = sorted(os.listdir(file_path))
     except:
         if num_runs == 1:
-            file_path = f'/home/ahaas/BachelorThesis/distparams_singleNN_{distribution.lower()}_HP1'
+            file_path = f'/home/ahaas/BachelorThesis/distparams_leadNN2_{distribution.lower()}_3'
         else:
-            file_path = f'/home/ahaas/BachelorThesis/distparams_singleNN_{distribution.lower()}_{num + 1}'
+            file_path = f'/home/ahaas/BachelorThesis/distparams_leadNN2_{distribution.lower()}_{num + 1}'
         dist_file_list = sorted(os.listdir(file_path))
         print(file_path)
 
@@ -53,17 +53,18 @@ for num in range(num_runs):
     param_dfs.append(dist_params.add_suffix(f'_{num+1}'))
 
 #apply mask, to eliminate outliers
-no_outlier_dfs = []
-for param_df in param_dfs:
-    mask = param_df.index.hour == 25
-    param_df = param_df[~mask]
-    no_outlier_dfs.append(param_df)
-param_dfs = no_outlier_dfs
+#no_outlier_dfs = []
+#for param_df in param_dfs:
+#    mask = param_df.index.hour == 25
+#    param_df = param_df[~mask]
+#    no_outlier_dfs.append(param_df)
+#param_dfs = no_outlier_dfs
 data.index = pd.to_datetime(data.index)
 
 if distribution.lower() == 'normal':
     for num, df in enumerate(param_dfs):
         num += 1
+        #df = df.iloc[:1000 , :]
         quantiles = df.apply(lambda x: sps.norm.ppf(quantile_array, loc=x[f'loc_{num}'], scale=x[f'scale_{num}']), axis=1)
         median_series = df.apply(lambda x: sps.norm.median(loc=x[f'loc_{num}'], scale=x[f'scale_{num}']), axis=1)
         y = data.loc[df.index, 'Price']
