@@ -46,7 +46,7 @@ def runoneday(inp):
     Y = df.iloc[:, 0].to_numpy()
     Y = Y[7*24:-24] # skip first 7 days
 
-    X = np.zeros(((1456+1)*24, 15))
+    X = np.zeros(((1456+1)*24, 17))
     for d in range(7*24, (1456*24)+24):
         X[d, 0] = df.iloc[(d-1*24), 0] # D-1 price
         X[d, 1] = df.iloc[(d-2*24), 0] # D-2 price
@@ -62,10 +62,12 @@ def runoneday(inp):
         X[d, 11] = df.iloc[(d-2*24), 5] # D-2 TTF_Gas
         X[d, 12] = df.iloc[(d-2*24), 6] # D-2 Brent oil
         X[d, 13] = df.index[d].weekday()
-        X[d, 14] = df.index[d].hour #lead time
+        X[d, 16] = df.index[d].hour #lead time
+        X[d, 15] = np.sin(2 * np.pi * (df.index[d].hour / 24))  # cyle
+        X[d, 14] = np.cos(2 * np.pi * (df.index[d].hour / 24))
     # '''
     # input feature selection
-    colmask = [False] * 15
+    colmask = [False] * 17
     if params['price_D-1']:
         colmask[0] = True
     if params['price_D-2']:
@@ -94,17 +96,19 @@ def runoneday(inp):
         colmask[12] = True
     if params['Dummy']:
         colmask[13] = True
-
     colmask[14] = True
+    colmask[15] = True
+    colmask[16] = True
+
     X = X[:, colmask]
     Xf = X[-24:, :]
     X = X[(7*24):-24, :]
 
-    var_inputs = keras.Input(X.shape[1]-1, name='var_input')
+    var_inputs = keras.Input(X.shape[1]-1, name='var_inputs')
     var_inputs = keras.layers.BatchNormalization()(var_inputs)
 
     emb_input = keras.Input(1, name='emb_input')
-    lead_emb = keras.layers.Embedding(input_dim=24, output_dim=1, input_length=1)(emb_input)
+    lead_emb = keras.layers.Embedding(input_dim=24, output_dim=4, input_length=1)(emb_input)
     lead_emb = keras.layers.Flatten()(lead_emb)
 
     last_layer = keras.layers.concatenate([var_inputs, lead_emb])
@@ -178,7 +182,7 @@ def runoneday(inp):
                     skewness=t[..., 3]))(linear)
         else:
             raise ValueError(f'Incorrect distribution {distribution}')
-        model = keras.Model(inputs=[var_inputs, emb_input], outputs=outputs)
+        model = keras.Model(inputs={'var_inputs': var_inputs, 'emb_input': emb_input}, outputs=outputs)
         model.compile(optimizer=keras.optimizers.Adam(params['learning_rate']),
                       loss=lambda y, rv_y: -rv_y.log_prob(y),
                       metrics='mae')
@@ -186,8 +190,8 @@ def runoneday(inp):
     #cutting down X to safe fitting time
     #cutter = X.shape[0] * np.random.random_sample(1456-7)
     #X = X[cutter.astype(int), :]
-    X = X[-1500:, :]
-    Y = Y[-1500:]
+    X = X[-15000:, :]
+    Y = Y[-15000:]
     callbacks = [keras.callbacks.EarlyStopping(patience=50, restore_best_weights=True)]
     perm = np.random.permutation(np.arange(X.shape[0]))
     VAL_DATA = .2
@@ -199,15 +203,15 @@ def runoneday(inp):
     Y_train = Y[trainsubset]
     Y_val = Y[valsubset]
 
-    X_train = {'input_1': X_train[:, :-1],
+    X_train = {'var_inputs': X_train[:, :-1],
                'emb_input': X_train[:, -1].astype(int)}
-    X_val = {'input_1': X_val[:, :-1],
+    X_val = {'var_inputs': X_val[:, :-1],
                'emb_input': X_val[:, -1].astype(int)}
     model.fit(X_train, Y_train, epochs=1500, validation_data=(X_val, Y_val),
               callbacks=callbacks, batch_size=32, verbose=False)
 
     if paramcount[distribution] is not None:
-        Xf = {'input_1': Xf[:, :-1],
+        Xf = {'var_inputs': Xf[:, :-1],
               'emb_input': Xf[:, -1].astype(int)}
         dist = model(Xf)
         if distribution == 'Normal':

@@ -37,7 +37,7 @@ for num in range(num_runs):
         if num_runs == 1:
             file_path = f'/home/ahaas/BachelorThesis/distparams_leadNN2_{distribution.lower()}_3'
         else:
-            file_path = f'/home/ahaas/BachelorThesis/distparams_leadNN2_{distribution.lower()}_{num + 1}'
+            file_path = f'/home/ahaas/BachelorThesis/distparams_leadNN_{distribution.lower()}_{num + 1}'
         dist_file_list = sorted(os.listdir(file_path))
         print(file_path)
 

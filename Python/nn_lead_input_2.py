@@ -1,3 +1,5 @@
+import math
+
 import pandas as pd
 import numpy as np
 import tensorflow.compat.v2 as tf
@@ -25,7 +27,7 @@ else:
     folder = '/home/ahaas/BachelorThesis'
 
 #load params
-with open(f'{folder}/params_trial_{distribution}{trial}.json', 'r') as j:
+with open(f'/home/ahaas/BachelorThesis/params_trial_{distribution}{trial}.json', 'r') as j:
     params = json.load(j)
 
 #read data
@@ -36,82 +38,75 @@ except:
 data.index = [datetime.strptime(e, '%Y-%m-%d %H:%M:%S') for e in data.index]
 
 #create directory
-if not os.path.exists(f'{folder}/distparams_leadNN1.2_{distribution.lower()}_{trial}'):
-    os.mkdir(f'{folder}/distparams_leadNN1.2_{distribution.lower()}_{trial}')
-print(f'Directory: {folder}/distparams_leadNN1.2_{distribution.lower()}_{trial}')
+if not os.path.exists(f'{folder}/distparams_leadNN1.3_{distribution.lower()}_{trial}'):
+    os.mkdir(f'{folder}/distparams_leadNN1.3_{distribution.lower()}_{trial}')
+print(f'Directory: {folder}/distparams_leadNN1.3_{distribution.lower()}_{trial}')
+
 def runoneday(inp):
     params, dayno = inp
     df = data.iloc[dayno*24:dayno*24+1456*24+24]
     # prepare the input/output dataframes
     Y = df.iloc[:, 0].to_numpy()
     Y = Y[7*24:(1456*24)] # skip first 7 days
-    fc_period = int(24)
-    last_price = df.groupby(df.index.date)['Price'].last()
-    X = np.zeros(((1456*24) + fc_period, 19))
-    for d in range(7*24, (1456*24) + fc_period):
-        X[d, 0] = df.iloc[(d-1*24), 0] # D-1 price
-        X[d, 1] = df.iloc[(d-2*24), 0] # D-2 price
-        X[d, 2] = df.iloc[(d-3*24), 0] # D-3 price
-        X[d, 3] = df.iloc[(d-7*24), 0] # D-7 price
-        X[d, 4] = df.iloc[d, 1] # D load forecast
-        X[d, 5] = df.iloc[(d-1*24), 1] # D-1 load forecast
-        X[d, 6] = df.iloc[(d-7*24), 1] # D-7 load forecast
-        X[d, 7] = df.iloc[d*24, 2] # D RES sum forecast
-        X[d, 8] = df.iloc[(d-1*24), 2] # D-1 RES sum forecast
-        X[d, 9] = df.iloc[(d-2*24), 3] # D-2 EUA
-        X[d, 10] = df.iloc[(d-2*24), 4] # D-2 API2_Coal
-        X[d, 11] = df.iloc[(d-2*24), 5] # D-2 TTF_Gas
-        X[d, 12] = df.iloc[(d-2*24), 6] # D-2 Brent oil
-        X[d, 13] = df.index[d].weekday()
-        X[d, 14] = df.index[d].hour #lead time
-        X[d, 15] = np.sin(2 * np.pi * (df.index[d].hour / 24))  # cyle
-        X[d, 16] = np.cos(2 * np.pi * (df.index[d].hour / 24))
-        X[d, 17] = df.iloc[d-1, 0 ] #H-1 price
-        X[d, 18] = last_price.iloc[(d//24)-1] #last price of D-1
+
+    X = np.zeros((1456 + 1, 221))
+    for d in range(7, 1456+1):
+        X[d, :24] = df.iloc[(d-1)*24:d*24, 0] # D-1 price
+        X[d, 24:48] = df.iloc[(d-2)*24:(d-1)*24, 0] # D-2 price
+        X[d, 48:72] = df.iloc[(d-3)*24:(d-2)*24, 0] # D-3 price
+        X[d, 72:96] = df.iloc[(d-7)*24:(d-6)*24, 0] # D-7 price
+        X[d, 96:120] = df.iloc[d*24:(d+1)*24, 1] # D load forecast
+        X[d, 120:144] = df.iloc[(d-1)*24:d*24, 1] # D-1 load forecast
+        X[d, 144:168] = df.iloc[(d-7)*24:(d-6)*24, 1] # D-7 load forecast
+        X[d, 168:192] = df.iloc[d*24:(d+1)*24, 2] # D RES sum forecast
+        X[d, 192:216] = df.iloc[(d-1)*24:d*24, 2] # D-1 RES sum forecast
+        X[d, 216] = df.iloc[(d-2*24), 3] # D-2 EUA
+        X[d, 217] = df.iloc[(d-2*24), 4] # D-2 API2_Coal
+        X[d, 218] = df.iloc[(d-2*24), 5] # D-2 TTF_Gas
+        X[d, 219] = df.iloc[(d-2*24), 6] # D-2 Brent oil
+        X[d, 220] = df.index[d].weekday()
     # '''
     # input feature selection
-    colmask = [False] * 19
+    colmask = [False] * 222
     if params['price_D-1']:
-        colmask[0] = True
+        colmask[:24] = [True] * 24
     if params['price_D-2']:
-        colmask[1] = True
+        colmask[24:48] = [True] * 24
     if params['price_D-3']:
-        colmask[2] = True
+        colmask[48:72] = [True] * 24
     if params['price_D-7']:
-        colmask[3] = True
+        colmask[72:96] = [True] * 24
     if params['load_D']:
-        colmask[4] = True
+        colmask[96:120] = [True] * 24
     if params['load_D-1']:
-        colmask[5] = True
+        colmask[120:144] = [True] * 24
     if params['load_D-7']:
-        colmask[6] = True
+        colmask[144:168] = [True] * 24
     if params['RES_D']:
-        colmask[7] = True
+        colmask[168:192] = [True] * 24
     if params['RES_D-1']:
-        colmask[8] = True
+        colmask[192:216] = [True] * 24
     if params['EUA']:
-        colmask[9] = True
+        colmask[216] = True
     if params['Coal']:
-        colmask[10] = True
+        colmask[217] = True
     if params['Gas']:
-        colmask[11] = True
+        colmask[218] = True
     if params['Oil']:
-        colmask[12] = True
+        colmask[219] = True
     if params['Dummy']:
-        colmask[13] = True
-    colmask[14] = True  #lead
-    colmask[15] = False #sin
-    colmask[16] = False #cos
-    colmask[17] = False #H-1
-    colmask[18] = True #last price D-1
+        colmask[220] = True
+    colmask[221] = True
 
+    lead_col = np.tile(np.arange(24), X.shape[0])
+    X = np.repeat(X, 24, axis=0)
+    X = np.column_stack((X, lead_col))
     X = X[:, colmask]
-    Xf = X[-fc_period:, :]
-    X = X[(7*24):-fc_period, :]
+    Xf = X[-24:, :]
+    X = X[(7*24):-24, :]
 
     inputs = keras.Input(X.shape[1])
     last_layer = keras.layers.BatchNormalization()(inputs)
-
 
     # dropout
     dropout = params['dropout']  # trial.suggest_categorical('dropout', [True, False])
@@ -207,21 +202,21 @@ def runoneday(inp):
         elif distribution in {'JSU', 'SinhArcsinh', 'NormalInverseGaussian'}:
             getters = {'loc': dist.loc, 'scale': dist.scale,
                        'tailweight': dist.tailweight, 'skewness': dist.skewness}
-        params = {k: v.numpy().tolist() for k, v in getters.items()}
-        print(params)
-        with open(os.path.join(f'{folder}/distparams_leadNN1.2_{distribution.lower()}_{trial}', datetime.strftime(df.index[-24], '%Y-%m-%d')),'w') as j:
-            json.dump(params, j)
-        #fc_list = [{k: v.numpy().tolist()[day*24:(day+1)*24] for k, v in getters.items()} for day in range(Xf.shape[0]//24)]
-        #print(fc_list)
+        #params = {k: v.numpy().tolist() for k, v in getters.items()}
+        #print(params)
+        #with open(os.path.join(f'{folder}/distparams_leadNN2_{distribution.lower()}_{trial}', datetime.strftime(df.index[-24], '%Y-%m-%d')),'w') as j:
+        #    json.dump(params, j)
+        fc_list = [{k: v.numpy().tolist()[day*24:(day+1)*24] for k, v in getters.items()} for day in range(Xf.shape[0]//24)]
+        print(fc_list)
 
-        #for index, fc in enumerate(fc_list):
-        #    json.dump(fc, open(os.path.join(f'{folder}/distparams_leadNN2_{distribution.lower()}_{trial}', datetime.strftime(df.index[24*(index - Xf.shape[0]//24)], '%Y-%m-%d')), 'w'))
+        for index, fc in enumerate(fc_list):
+            json.dump(fc, open(os.path.join(f'{folder}/distparams_leadNN1.3_{distribution.lower()}_{trial}', datetime.strftime(df.index[24*(index - Xf.shape[0]//24)], '%Y-%m-%d')), 'w'))
 
 inputlist = [(params, day) for day in range(len(data) // 24 - 1456)]
 
 start_time = datetime.now()
 print(f'Program started at {start_time.strftime("%Y-%m-%d %H:%M:%S")}')
-
+inputlist = inputlist[-364:]
 with Pool(8) as p:
     _ = p.map(runoneday, inputlist)
 #for list in inputlist:
@@ -231,4 +226,4 @@ with Pool(8) as p:
 
 end_time = datetime.now()
 compute_time = (end_time - start_time).total_seconds()
-print(f'Program ended at {end_time.strftime("%Y-%m-%d %H:%M:%S")} \n computation time: {str(timedelta(seconds=compute_time))}')
+print(f'Program ended at {end_time.strftime("%Y-%m-%d %H:%M:%S")} \nComputation time: {str(timedelta(seconds=compute_time))}')
