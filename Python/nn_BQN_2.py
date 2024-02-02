@@ -23,7 +23,7 @@ print('\n')
 print(sys.executable)
 distribution = 'Normal'
 
-trial = 3
+trial = 0
 d_degree = 12
 
 params = {'Coal': True,
@@ -52,8 +52,8 @@ params = {'Coal': True,
           'regularize_h2_activation': False,
           'regularize_h2_kernel': False}
 
-if not os.path.exists(f'/home/ahaas/BachelorThesis/forecasts_probNN_BQN_{trial}'):
-    os.mkdir(f'/home/ahaas/BachelorThesis/forecasts_probNN_BQN_{trial}')
+if not os.path.exists(f'/home/ahaas/BachelorThesis/forecasts_probNN_BQN2_{trial}'):
+    os.mkdir(f'/home/ahaas/BachelorThesis/forecasts_probNN_BQN2_{trial}')
 
 # read data file
 try:
@@ -63,7 +63,7 @@ except:
 
 data.index = [datetime.strptime(e, '%Y-%m-%d %H:%M:%S') for e in data.index]
 
-q_level_loss = K.constant(np.arange(0.01, 1, 0.01))
+q_level_loss = np.arange(0.01, 1, 0.01)
 B = np.zeros((d_degree+1, 99))
 for d in range(d_degree+1):
     B[d, :] = sps.binom.pmf(d, d_degree, q_level_loss)
@@ -71,87 +71,93 @@ for d in range(d_degree+1):
 def qt_loss(y_true, y_pred):
     # Quantiles calculated via basis and increments
     B_tensor = K.constant(B, shape=(d_degree+1, 99), dtype=tf.float32)
-    #y_true = tf.cast(y_true, dtype=tf.float32)
-    #y_pred = tf.cast(y_pred, dtype=tf.float32)
-    #y_pred = tf.reshape(y_pred, (y_true.shape[0], d_degree+1))
+    y_pred = tf.cast(y_pred, dtype=tf.float32)
 
-    q = K.dot(K.cumsum(y_pred, axis=1), B_tensor)
+    y_pred = tf.reshape(y_pred, (-1, y_true.shape[1], d_degree+1))
+
+    q = K.dot(K.cumsum(y_pred, axis=2), B_tensor)
+    y_true = tf.expand_dims(y_true, axis=2)
+
     # Calculate CRPS
-    e1 = (y_true - q) * tf.constant(q_level_loss, shape=(1, 99), dtype=tf.float32)
-    e2 = (q - y_true) * tf.constant(q_level_loss, shape=(1, 99), dtype=tf.float32)
+    err = tf.subtract(y_true, q)
 
-    # Find correct values (max) and return mean
-    return tf.reduce_mean(tf.maximum(e1, e2), axis=1)
-#print(qt_loss(tf.constant(np.arange(1), dtype=tf.float32), tf.constant(np.random.rand(9), shape=(1,9), dtype=tf.float32)))
+    e1 = err * tf.constant(q_level_loss, shape=(1, 99), dtype=tf.float32)
+    e2 = err * tf.constant(q_level_loss - 1, shape=(1, 99), dtype=tf.float32)
 
+    scores = tf.maximum(e1, e2)
+    scores = tf.reduce_mean(scores, axis=2)
+    scores = tf.reduce_mean(scores, axis=1)
+    return scores
 def bern_quants(alpha):
-    return np.dot(np.cumsum(alpha, axis=0), B)
-#qt_loss(tf.constant(1, dtype=tf.float32), tf.constant(np.random.rand(9), dtype=tf.float32, shape= [1,9]))
+    alpha = alpha.reshape(24, d_degree+1)
+    return np.dot(np.cumsum(alpha, axis=1), B)
+
 def runoneday(inp):
     params, dayno = inp
     df = data.iloc[dayno * 24:dayno * 24 + 1456 * 24 + 24]
-    #if datetime.strftime(df.index[-24], '%Y-%m-%d') in os.listdir(f'/home/ahaas/BachelorThesis/forecasts_probNN_BQN_{trial}'):
-    #    return
     # prepare the input/output dataframes
-    Y = df.iloc[:, 0].to_numpy()
-    Y = Y[7 * 24:(1456 * 24)]  # skip first 7 days
-    fc_period = int(24)
-    X = np.zeros(((1456 * 24) + fc_period, 15))
-    for d in range(7 * 24, (1456 * 24) + fc_period):
-        X[d, 0] = df.iloc[(d - 1 * 24), 0]  # D-1 price
-        X[d, 1] = df.iloc[(d - 2 * 24), 0]  # D-2 price
-        X[d, 2] = df.iloc[(d - 3 * 24), 0]  # D-3 price
-        X[d, 3] = df.iloc[(d - 7 * 24), 0]  # D-7 price
-        X[d, 4] = df.iloc[d, 1]  # D load forecast
-        X[d, 5] = df.iloc[(d - 1 * 24), 1]  # D-1 load forecast
-        X[d, 6] = df.iloc[(d - 7 * 24), 1]  # D-7 load forecast
-        X[d, 7] = df.iloc[d, 2]  # D RES sum forecast
-        X[d, 8] = df.iloc[(d - 1 * 24), 2]  # D-1 RES sum forecast
-        X[d, 9] = df.iloc[(d - 2 * 24), 3]  # D-2 EUA
-        X[d, 10] = df.iloc[(d - 2 * 24), 4]  # D-2 API2_Coal
-        X[d, 11] = df.iloc[(d - 2 * 24), 5]  # D-2 TTF_Gas
-        X[d, 12] = df.iloc[(d - 2 * 24), 6]  # D-2 Brent oil
-        X[d, 13] = df.index[d].weekday()
-        X[d, 14] = df.index[d].hour  # lead time
+    Y = np.zeros((1456, 24))
+    # Yf = np.zeros((1, 24)) # no Yf for rolling prediction
+    for d in range(1456):
+        Y[d, :] = df.loc[df.index[d * 24:(d + 1) * 24], 'Price'].to_numpy()
+    Y = Y[7:, :]  # skip first 7 days
+    # for d in range(1):
+    #     Yf[d, :] = df.loc[df.index[(d+1092)*24:(d+1093)*24], 'Price'].to_numpy()
+    X = np.zeros((1456 + 1, 221))
+    for d in range(7, 1456 + 1):
+        X[d, :24] = df.loc[df.index[(d - 1) * 24:(d) * 24], 'Price'].to_numpy()  # D-1 price
+        X[d, 24:48] = df.loc[df.index[(d - 2) * 24:(d - 1) * 24], 'Price'].to_numpy()  # D-2 price
+        X[d, 48:72] = df.loc[df.index[(d - 3) * 24:(d - 2) * 24], 'Price'].to_numpy()  # D-3 price
+        X[d, 72:96] = df.loc[df.index[(d - 7) * 24:(d - 6) * 24], 'Price'].to_numpy()  # D-7 price
+        X[d, 96:120] = df.loc[df.index[(d) * 24:(d + 1) * 24], df.columns[1]].to_numpy()  # D load forecast
+        X[d, 120:144] = df.loc[df.index[(d - 1) * 24:(d) * 24], df.columns[1]].to_numpy()  # D-1 load forecast
+        X[d, 144:168] = df.loc[df.index[(d - 7) * 24:(d - 6) * 24], df.columns[1]].to_numpy()  # D-7 load forecast
+        X[d, 168:192] = df.loc[df.index[(d) * 24:(d + 1) * 24], df.columns[2]].to_numpy()  # D RES sum forecast
+        X[d, 192:216] = df.loc[df.index[(d - 1) * 24:(d) * 24], df.columns[2]].to_numpy()  # D-1 RES sum forecast
+        X[d, 216] = df.loc[df.index[(d - 2) * 24:(d - 1) * 24:24], df.columns[3]].to_numpy()  # D-2 EUA
+        X[d, 217] = df.loc[df.index[(d - 2) * 24:(d - 1) * 24:24], df.columns[4]].to_numpy()  # D-2 API2_Coal
+        X[d, 218] = df.loc[df.index[(d - 2) * 24:(d - 1) * 24:24], df.columns[5]].to_numpy()  # D-2 TTF_Gas
+        X[d, 219] = data.loc[data.index[(d - 2) * 24:(d - 1) * 24:24], data.columns[6]].to_numpy()  # D-2 Brent oil
+        X[d, 220] = data.index[d].weekday()
     # '''
     # input feature selection
-    colmask = [False] * 15
+    colmask = [False] * 221
     if params['price_D-1']:
-        colmask[0] = True
+        colmask[:24] = [True] * 24
     if params['price_D-2']:
-        colmask[1] = True
+        colmask[24:48] = [True] * 24
     if params['price_D-3']:
-        colmask[2] = True
+        colmask[48:72] = [True] * 24
     if params['price_D-7']:
-        colmask[3] = True
+        colmask[72:96] = [True] * 24
     if params['load_D']:
-        colmask[4] = True
+        colmask[96:120] = [True] * 24
     if params['load_D-1']:
-        colmask[5] = True
+        colmask[120:144] = [True] * 24
     if params['load_D-7']:
-        colmask[6] = True
+        colmask[144:168] = [True] * 24
     if params['RES_D']:
-        colmask[7] = True
+        colmask[168:192] = [True] * 24
     if params['RES_D-1']:
-        colmask[8] = True
+        colmask[192:216] = [True] * 24
     if params['EUA']:
-        colmask[9] = True
+        colmask[216] = True
     if params['Coal']:
-        colmask[10] = True
+        colmask[217] = True
     if params['Gas']:
-        colmask[11] = True
+        colmask[218] = True
     if params['Oil']:
-        colmask[12] = True
+        colmask[219] = True
     if params['Dummy']:
-        colmask[13] = True
-    colmask[14] = True  # lead
-
+        colmask[220] = True
     X = X[:, colmask]
-    Xf = X[-fc_period:, :]
-    X = X[(7*24):-fc_period, :]
+    # '''
+    Xf = X[-1:, :]
+    X = X[7:-1, :]
 
     inputs = keras.Input(X.shape[1])
     last_layer = keras.layers.BatchNormalization()(inputs)
+
     # dropout
     dropout = params['dropout'] # trial.suggest_categorical('dropout', [True, False])
     if dropout:
@@ -187,14 +193,12 @@ def runoneday(inp):
                                 kernel_regularizer=keras.regularizers.L1(h2_kernel_rate),
                                 activity_regularizer=keras.regularizers.L1(h2_activation_rate))(hidden)
 
-    outputs = keras.layers.Dense((d_degree+1), activation='softplus')(hidden)
+    outputs = keras.layers.Dense(24*(d_degree+1), activation='softplus')(hidden)
     model = keras.Model(inputs=inputs, outputs=outputs)
     model.compile(optimizer=keras.optimizers.Adam(params['learning_rate']),
                   loss=qt_loss,
                   metrics=[qt_loss])
 
-    X = X[-1500:, :]
-    Y = Y[-1500:]
     # define callbacks
     callbacks = [keras.callbacks.EarlyStopping(patience=50, restore_best_weights=True)]
     perm = np.random.permutation(np.arange(X.shape[0]))
@@ -207,8 +211,9 @@ def runoneday(inp):
     predDF = pd.DataFrame(index=df.index[-24:])
     predDF['forecast_quantiles'] = pd.NA
     pred = model.predict(Xf)
-    predDF.loc[predDF.index[:], 'forecast_quantiles'] = [bern_quants(hour) for hour in pred]
-    predDF.to_csv(os.path.join(f'/home/ahaas/BachelorThesis/forecasts_probNN_BQN_{trial}', datetime.strftime(df.index[-24], '%Y-%m-%d')))
+    quantiles = bern_quants(pred)
+    predDF.loc[predDF.index[:], 'forecast_quantiles'] = [hour for hour in quantiles]
+    predDF.to_csv(os.path.join(f'/home/ahaas/BachelorThesis/forecasts_probNN_BQN2_{trial}', datetime.strftime(df.index[-24], '%Y-%m-%d')))
     print(datetime.strftime(df.index[-24], '%Y-%m-%d'))
     print(predDF['forecast_quantiles'].apply(lambda x : np.median(x)))
     print(np.mean(hist.history['loss']))
@@ -227,10 +232,10 @@ print(len(inputlist))
 start_time = datetime.now()
 print(f'Program started at {start_time.strftime("%Y-%m-%d %H:%M:%S")}')
 
-#with Pool(8) as p:
-#    _ = p.map(runoneday, inputlist)
+with Pool(8) as p:
+    _ = p.map(runoneday, inputlist)
 
-runoneday(inputlist[0])
+#runoneday(inputlist[0])
 #for day in inputlist:
 #    runoneday(day)
 

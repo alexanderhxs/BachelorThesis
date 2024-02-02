@@ -1,4 +1,5 @@
 import math
+import multiprocessing
 
 import pandas as pd
 import numpy as np
@@ -38,9 +39,9 @@ except:
 data.index = [datetime.strptime(e, '%Y-%m-%d %H:%M:%S') for e in data.index]
 
 #create directory
-if not os.path.exists(f'{folder}/distparams_leadNN1.3_{distribution.lower()}_{trial}'):
-    os.mkdir(f'{folder}/distparams_leadNN1.3_{distribution.lower()}_{trial}')
-print(f'Directory: {folder}/distparams_leadNN1.3_{distribution.lower()}_{trial}')
+if not os.path.exists(f'{folder}/distparams_leadNN1.3.1_{distribution.lower()}_{trial}'):
+    os.mkdir(f'{folder}/distparams_leadNN1.3.1_{distribution.lower()}_{trial}')
+print(f'Directory: {folder}/distparams_leadNN1.3.1_{distribution.lower()}_{trial}')
 
 def runoneday(inp):
     params, dayno = inp
@@ -185,14 +186,14 @@ def runoneday(inp):
     #cutting down X to safe fitting time
     #cutter = X.shape[0] * np.random.random_sample(1456-7)
     #X = X[cutter.astype(int), :]
-    X = X[-1500:, :]
-    Y = Y[-1500:]
+    X = X[-6000:, :]
+    Y = Y[-6000:]
     callbacks = [keras.callbacks.EarlyStopping(patience=50, restore_best_weights=True)]
     perm = np.random.permutation(np.arange(X.shape[0]))
     VAL_DATA = .2
     trainsubset = perm[:int((1 - VAL_DATA) * len(perm))]
     valsubset = perm[int((1 - VAL_DATA) * len(perm)):]
-    model.fit(X[trainsubset], Y[trainsubset], epochs=1500, validation_data=(X[valsubset], Y[valsubset]),
+    hist = model.fit(X[trainsubset], Y[trainsubset], epochs=1500, validation_data=(X[valsubset], Y[valsubset]),
               callbacks=callbacks, batch_size=32, verbose=False)
 
     if paramcount[distribution] is not None:
@@ -210,19 +211,21 @@ def runoneday(inp):
         print(fc_list)
 
         for index, fc in enumerate(fc_list):
-            json.dump(fc, open(os.path.join(f'{folder}/distparams_leadNN1.3_{distribution.lower()}_{trial}', datetime.strftime(df.index[24*(index - Xf.shape[0]//24)], '%Y-%m-%d')), 'w'))
+            json.dump(fc, open(os.path.join(f'{folder}/distparams_leadNN1.3.1_{distribution.lower()}_{trial}', datetime.strftime(df.index[24*(index - Xf.shape[0]//24)], '%Y-%m-%d')), 'w'))
+        return hist.history['loss'], hist.history['val_loss']
 
 inputlist = [(params, day) for day in range(len(data) // 24 - 1456)]
 
 start_time = datetime.now()
 print(f'Program started at {start_time.strftime("%Y-%m-%d %H:%M:%S")}')
-inputlist = inputlist[-364:]
+inputlist = inputlist[16:]
+
+
 with Pool(8) as p:
-    _ = p.map(runoneday, inputlist)
+    _ = (p.map(runoneday, inputlist))
 #for list in inputlist:
 #    runoneday(list)
-
-#runoneday(inputlist[0])
+#runoneday(inputlist[321])
 
 end_time = datetime.now()
 compute_time = (end_time - start_time).total_seconds()

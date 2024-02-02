@@ -16,6 +16,7 @@ except:
 distribution = 'Normal'
 num_runs = 1
 num_runs2 = 1
+outlier_threshold = 20
 quantile_array = np.arange(0.01, 1, 0.01)
 
 def pinball_score(observed, pred_quantiles):
@@ -28,7 +29,7 @@ param_dfs2 = []
 #load data
 for num in range(num_runs):
     if num_runs == 1:
-        file_path = f'/home/ahaas/BachelorThesis/distparams_leadNN_{distribution.lower()}_3'
+        file_path = f'/home/ahaas/BachelorThesis/distparams_leadNN1.3.1_{distribution.lower()}_3'
     else:
         file_path = f'/home/ahaas/BachelorThesis/distparams_leadNN1_{distribution.lower()}_{num + 3}'
     dist_file_list = sorted(os.listdir(file_path))
@@ -45,7 +46,7 @@ for num in range(num_runs):
     param_dfs.append(dist_params.add_suffix(f'_{num+1}'))
 for num in range(num_runs2):
     if num_runs2 == 1:
-        file_path = f'/home/ahaas/BachelorThesis/distparams_leadNN2_{distribution.lower()}_3'
+        file_path = f'/home/ahaas/BachelorThesis/distparams_leadNN1.3_{distribution.lower()}_3'
     else:
         file_path = f'/home/ahaas/BachelorThesis/distparams_leadNN1_{distribution.lower()}_{num + 3}'
     dist_file_list = sorted(os.listdir(file_path))
@@ -62,15 +63,15 @@ for num in range(num_runs2):
     param_dfs2.append(dist_params.add_suffix(f'_{num+1}'))
 data.index = pd.to_datetime(data.index)
 def plotting(y, loc_series, crps_observations, quantiles, loc_series2=None, crps_observations2=None):
-    if not (loc_series2 is None and crps_observations2 is None):
-        plt.plot(y.index, pd.Series(crps_observations2).rolling(window=24 * 7).mean(), label='CRPS over fc single period',
-             color='orange', linewidth=1)
-        plt.plot(y.index, (np.sqrt((y.values - loc_series2) ** 2)).rolling(window=24 * 7).mean(),
-                 label='RSME over fc single period', color='lightgrey', linestyle='--', linewidth=1)
     plt.plot(y.index, pd.Series(crps_observations).rolling(window=24 * 7).mean(), label='CRPS over fc rolling window',
              color='blue', linewidth=1)
     plt.plot(y.index, (np.sqrt((y.values - loc_series) ** 2)).rolling(window=24 * 7).mean(),
              label='RSME over fc roling window', color='darkgrey', linestyle='--', linewidth=1)
+    if not (loc_series2 is None and crps_observations2 is None):
+        plt.plot(y.index, pd.Series(crps_observations2[:len(crps_observations)]).rolling(window=24 * 7).mean(), label='CRPS over fc single period (2)',
+             color='orange', linewidth=1)
+        plt.plot(y.index, (np.sqrt((y.values - loc_series2[:len(loc_series)]) ** 2)).rolling(window=24 * 7).mean(),
+                 label='RSME over fc single period (2)', color='lightgrey', linestyle='--', linewidth=1)
     plt.xticks(rotation=45)
     plt.legend()
     #plt.xlim(pd.Timestamp('2019-01-01'), pd.Timestamp('2019-04-30'))
@@ -107,7 +108,7 @@ def plotting(y, loc_series, crps_observations, quantiles, loc_series2=None, crps
 
     ax2 = ax1.twinx()
     ax2.plot(hours, y.groupby(y.index.hour).mean(), label='Mean price', linestyle='--', color='red')
-    ax2.plot(hours, y.groupby(y.index.hour).var(), label='Variance price', linestyle='--', color='orange')
+    ax2.plot(hours, y.groupby(y.index.hour).std(), label='Standard deviation price', linestyle='--', color='orange')
     ax2.set_ylim(bottom=0)
 
     ax1.legend(loc='upper left')
@@ -127,6 +128,12 @@ if distribution.lower() == 'normal':
         median_series = df.apply(lambda x: sps.norm.median(loc=x[f'loc_{num}'], scale=x[f'scale_{num}']), axis=1)
         y = data.loc[df.index, 'Price']
         crps_observations = [pinball_score(observed, quantiles_row) for observed, quantiles_row in zip(y, quantiles)]
+
+        df['crps'] = crps_observations
+        df['crps'] = df['crps'].rolling(24).mean()
+        outlier_mask = df['crps'] > outlier_threshold
+        print(df.loc[outlier_mask])
+
         mae = np.abs(y.values - median_series).mean()
         rmse = np.sqrt((y.values - df[f'loc_{num}']) ** 2).mean()
         print(f'Overall results for run Nr {num}')
