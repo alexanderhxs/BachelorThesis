@@ -39,19 +39,19 @@ except:
 data.index = [datetime.strptime(e, '%Y-%m-%d %H:%M:%S') for e in data.index]
 
 #create directory
-if not os.path.exists(f'{folder}/distparams_leadNN1.3.1_{distribution.lower()}_{trial}'):
-    os.mkdir(f'{folder}/distparams_leadNN1.3.1_{distribution.lower()}_{trial}')
-print(f'Directory: {folder}/distparams_leadNN1.3.1_{distribution.lower()}_{trial}')
+if not os.path.exists(f'{folder}/distparams_leadNN2.2_{distribution.lower()}_{trial}'):
+    os.mkdir(f'{folder}/distparams_leadNN2.2_{distribution.lower()}_{trial}')
+print(f'Directory: {folder}/distparams_leadNN2.2_{distribution.lower()}_{trial}')
 
 def runoneday(inp):
     params, dayno = inp
-    df = data.iloc[dayno*24:dayno*24+1456*24+24]
+    df = data
     # prepare the input/output dataframes
     Y = df.iloc[:, 0].to_numpy()
-    Y = Y[7*24:(1456*24)] # skip first 7 days
-
-    X = np.zeros((1456 + 1, 221))
-    for d in range(7, 1456+1):
+    Y = Y[7*24:(1456*24)]# skip first 7 days
+    fc_period = int(len(df)/24 - 1456)
+    X = np.zeros((1456 + fc_period, 221))
+    for d in range(7, 1456+fc_period):
         X[d, :24] = df.iloc[(d-1)*24:d*24, 0] # D-1 price
         X[d, 24:48] = df.iloc[(d-2)*24:(d-1)*24, 0] # D-2 price
         X[d, 48:72] = df.iloc[(d-3)*24:(d-2)*24, 0] # D-3 price
@@ -103,8 +103,8 @@ def runoneday(inp):
     X = np.repeat(X, 24, axis=0)
     X = np.column_stack((X, lead_col))
     X = X[:, colmask]
-    Xf = X[-24:, :]
-    X = X[(7*24):-24, :]
+    Xf = X[-fc_period*24:, :]
+    X = X[(7*24):-fc_period*24, :]
 
     inputs = keras.Input(X.shape[1])
     last_layer = keras.layers.BatchNormalization()(inputs)
@@ -186,8 +186,8 @@ def runoneday(inp):
     #cutting down X to safe fitting time
     #cutter = X.shape[0] * np.random.random_sample(1456-7)
     #X = X[cutter.astype(int), :]
-    X = X[-6000:, :]
-    Y = Y[-6000:]
+    #X = X[-6000:, :]
+    #Y = Y[-6000:]
     callbacks = [keras.callbacks.EarlyStopping(patience=50, restore_best_weights=True)]
     perm = np.random.permutation(np.arange(X.shape[0]))
     VAL_DATA = .2
@@ -211,21 +211,21 @@ def runoneday(inp):
         print(fc_list)
 
         for index, fc in enumerate(fc_list):
-            json.dump(fc, open(os.path.join(f'{folder}/distparams_leadNN1.3.1_{distribution.lower()}_{trial}', datetime.strftime(df.index[24*(index - Xf.shape[0]//24)], '%Y-%m-%d')), 'w'))
+            json.dump(fc, open(os.path.join(f'{folder}/distparams_leadNN2.2_{distribution.lower()}_{trial}', datetime.strftime(df.index[24*(index - Xf.shape[0]//24)], '%Y-%m-%d')), 'w'))
         return hist.history['loss'], hist.history['val_loss']
 
 inputlist = [(params, day) for day in range(len(data) // 24 - 1456)]
 
 start_time = datetime.now()
 print(f'Program started at {start_time.strftime("%Y-%m-%d %H:%M:%S")}')
-inputlist = inputlist[16:]
+#inputlist = inputlist[16:]
 
 
-with Pool(8) as p:
-    _ = (p.map(runoneday, inputlist))
+#with Pool(8) as p:
+#    _ = (p.map(runoneday, inputlist))
 #for list in inputlist:
 #    runoneday(list)
-#runoneday(inputlist[321])
+runoneday(inputlist[0])
 
 end_time = datetime.now()
 compute_time = (end_time - start_time).total_seconds()

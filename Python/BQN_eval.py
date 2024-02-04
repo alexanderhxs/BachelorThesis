@@ -30,7 +30,7 @@ quant_dfs = []
 for num in range(num_runs):
 
     if num_runs == 1:
-        file_path = f'/home/ahaas/BachelorThesis/forecasts_probNN_BQN_0'
+        file_path = f'/home/ahaas/BachelorThesis/forecasts_probNN_BQN2_0'
     else:
         file_path = f'/home/ahaas/BachelorThesis/forecasts_probNN_BQN_{num + 1}'
     dist_file_list = sorted(os.listdir(file_path))
@@ -53,5 +53,8 @@ for num, df in enumerate(quant_dfs):
     y = data.loc[df.index, 'Price']
     crps_obs = [pinball_score(obs, np.array(pred)) for obs, pred in zip(y, df[f'forecast_quantiles_{num+1}'])]
     CRPS = np.mean(crps_obs)
+    median_series = df[f'forecast_quantiles_{num+1}'].apply(lambda x: x[50])
+    mae = np.abs(y.values - median_series).mean()
     print(f'\n\nCRPS for trial {num+1}: {CRPS}')
+    print(f'MAE for trial {num+1}: {mae}')
 

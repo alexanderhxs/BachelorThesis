@@ -24,7 +24,7 @@ print(sys.executable)
 distribution = 'Normal'
 
 trial = 0
-d_degree = 12
+d_degree = 8
 
 params = {'Coal': True,
           'Dummy': True,
@@ -52,8 +52,8 @@ params = {'Coal': True,
           'regularize_h2_activation': False,
           'regularize_h2_kernel': False}
 
-if not os.path.exists(f'/home/ahaas/BachelorThesis/forecasts_probNN_BQN2_{trial}'):
-    os.mkdir(f'/home/ahaas/BachelorThesis/forecasts_probNN_BQN2_{trial}')
+if not os.path.exists(f'/home/ahaas/BachelorThesis/forecasts_probNN_BQN2_{trial}_8'):
+    os.mkdir(f'/home/ahaas/BachelorThesis/forecasts_probNN_BQN2_{trial}_8')
 
 # read data file
 try:
@@ -95,6 +95,8 @@ def bern_quants(alpha):
 def runoneday(inp):
     params, dayno = inp
     df = data.iloc[dayno * 24:dayno * 24 + 1456 * 24 + 24]
+    if datetime.strftime(df.index[-24], '%Y-%m-%d') in os.listdir(f'/home/ahaas/BachelorThesis/forecasts_probNN_BQN2_{trial}_8'):
+        return
     # prepare the input/output dataframes
     Y = np.zeros((1456, 24))
     # Yf = np.zeros((1, 24)) # no Yf for rolling prediction
@@ -213,7 +215,7 @@ def runoneday(inp):
     pred = model.predict(Xf)
     quantiles = bern_quants(pred)
     predDF.loc[predDF.index[:], 'forecast_quantiles'] = [hour for hour in quantiles]
-    predDF.to_csv(os.path.join(f'/home/ahaas/BachelorThesis/forecasts_probNN_BQN2_{trial}', datetime.strftime(df.index[-24], '%Y-%m-%d')))
+    predDF.to_csv(os.path.join(f'/home/ahaas/BachelorThesis/forecasts_probNN_BQN2_{trial}_8', datetime.strftime(df.index[-24], '%Y-%m-%d')))
     print(datetime.strftime(df.index[-24], '%Y-%m-%d'))
     print(predDF['forecast_quantiles'].apply(lambda x : np.median(x)))
     print(np.mean(hist.history['loss']))

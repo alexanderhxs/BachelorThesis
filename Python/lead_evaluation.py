@@ -15,8 +15,8 @@ except:
 
 distribution = 'Normal'
 num_runs = 1
-num_runs2 = 1
-outlier_threshold = 20
+num_runs2 = 0
+outlier_threshold = 4
 quantile_array = np.arange(0.01, 1, 0.01)
 
 def pinball_score(observed, pred_quantiles):
@@ -29,7 +29,7 @@ param_dfs2 = []
 #load data
 for num in range(num_runs):
     if num_runs == 1:
-        file_path = f'/home/ahaas/BachelorThesis/distparams_leadNN1.3.1_{distribution.lower()}_3'
+        file_path = f'/home/ahaas/BachelorThesis/distparams_probNN_{distribution.lower()}_3'
     else:
         file_path = f'/home/ahaas/BachelorThesis/distparams_leadNN1_{distribution.lower()}_{num + 3}'
     dist_file_list = sorted(os.listdir(file_path))
@@ -46,7 +46,7 @@ for num in range(num_runs):
     param_dfs.append(dist_params.add_suffix(f'_{num+1}'))
 for num in range(num_runs2):
     if num_runs2 == 1:
-        file_path = f'/home/ahaas/BachelorThesis/distparams_leadNN1.3_{distribution.lower()}_3'
+        file_path = f'/home/ahaas/BachelorThesis/distparams_leadNN2_{distribution.lower()}_3'
     else:
         file_path = f'/home/ahaas/BachelorThesis/distparams_leadNN1_{distribution.lower()}_{num + 3}'
     dist_file_list = sorted(os.listdir(file_path))
@@ -130,7 +130,7 @@ if distribution.lower() == 'normal':
         crps_observations = [pinball_score(observed, quantiles_row) for observed, quantiles_row in zip(y, quantiles)]
 
         df['crps'] = crps_observations
-        df['crps'] = df['crps'].rolling(24).mean()
+        df['crps'] = df['crps'].rolling(24*7).mean()
         outlier_mask = df['crps'] > outlier_threshold
         print(df.loc[outlier_mask])
 
