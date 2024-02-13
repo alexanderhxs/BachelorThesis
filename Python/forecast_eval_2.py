@@ -8,8 +8,8 @@ import re
 import ast
 
 
-start_time = '2019-06-11'
-length = 24
+start_time = '2018-12-27'
+length = 736*24
 draw_lines = False
 draw_shades = True
 
@@ -21,13 +21,16 @@ data = pd.read_csv('/home/ahaas/BachelorThesis/Datasets/DE.csv', index_col=0)
 data.index = pd.to_datetime(data.index)
 quantile_array = np.arange(0.01, 1, 0.01)
 timeframe = pd.date_range(pd.to_datetime(start_time), periods=length, freq='H')
+data = data.loc[timeframe, 'Price']
+
+def pinball_score(observed, pred_quantiles):
+    quantiles = np.arange(0.01, 1, 0.01)
+    scores = pd.Series(np.maximum((1 - quantiles) * (pred_quantiles - observed), quantiles * (observed - pred_quantiles)))
+    return scores.mean()
 
 fig, axs = plt.subplots(nrows=(len(fcs)), ncols=1, figsize=(16,9), sharey=True)
 
 for idx, (model, filepath) in enumerate(fcs.items()):
-
-    #plot true price
-    axs[idx].plot(timeframe, data.loc[timeframe, 'Price'], color='Black', label='True Price')
 
     #load data, conditioned on modeltype
     if model.startswith('BQN'):
@@ -41,6 +44,7 @@ for idx, (model, filepath) in enumerate(fcs.items()):
         df[f'forecast_quantiles'] = df[f'forecast_quantiles'].apply(lambda x: x.replace(' ', ','))
         df[f'forecast_quantiles'] = df[f'forecast_quantiles'].apply(lambda x: re.sub(',+', ',', x))
         df[f'forecast_quantiles'] = df[f'forecast_quantiles'].apply(ast.literal_eval)
+        df[f'forecast_quantiles'] = df[f'forecast_quantiles'].apply(lambda x: np.array(x, dtype=np.float64))
 
     elif model.startswith('Normal'):
         df = pd.DataFrame()
@@ -71,45 +75,17 @@ for idx, (model, filepath) in enumerate(fcs.items()):
         df = df.drop(['loc', 'scale'], axis=1)
     else:
         raise ValueError('ERROR: could not find ModelType')
-
-    #plot median
     df.index = pd.to_datetime(df.index)
-    axs[idx].plot(timeframe, df.loc[timeframe, 'forecast_quantiles'].apply(lambda x: x[49]), color='red', linestyle='--', label='median')
 
-    #highlight quantiles by shades
-    if draw_shades:
-        for q in np.arange(49, step=5):
-            axs[idx].fill_between(timeframe, df.loc[timeframe, 'forecast_quantiles'].apply(lambda x: x[q]),
-                                  df.loc[timeframe, 'forecast_quantiles'].apply(lambda x: x[98-q]), alpha=(0.1))
-    #highlight quantiles by lines
-    if draw_lines:
-        for q in np.arange(49, step=5):
-            axs[idx].plot(timeframe, df.loc[timeframe, 'forecast_quantiles'].apply(lambda x: x[q]), color='blue', alpha=0.1 + (q/100))
-            axs[idx].plot(timeframe, df.loc[timeframe, 'forecast_quantiles'].apply(lambda x: x[98-q]), color='blue',alpha=0.1 + (q/100))
+    crps = [pinball_score(y, pred_quantiles) for y, pred_quantiles in zip(data, df.loc[timeframe, 'forecast_quantiles'])]
+    axs[idx].plot(data.index, pd.Series(crps).rolling(24*7).mean(), color='red', label='CRPS ')
+
+    quant_dist = df.loc[timeframe, 'forecast_quantiles'].apply(lambda x: x[-1] - x[0])
+    ax_2 = plt.twinx(axs[idx])
+    ax_2.plot(data.index, quant_dist.rolling(24*7).mean(), color='black', label='Quantile distance')
 
     axs[idx].set_title(model)
 
-    #average quantile dist
-    avg_dist1 = df['forecast_quantiles'].apply(lambda x: x[-1] - x[0]).mean()
-    avg_dist2 = df['forecast_quantiles'].apply(lambda x: x[74] - x[24]).mean()
-    avg_dist3 = df['forecast_quantiles'].apply(lambda x: x[-1] - x[74]).mean()
-    avg_dist4 = df['forecast_quantiles'].apply(lambda x: x[24] - x[0]).mean()
-    print(f'Quantile differences for model: '+ model + ' over the whole forecast period')
-    print(f'Range 99% - 1%: {avg_dist1}')
-    print(f'Range 75% - 25%: {avg_dist2}')
-    print(f'Range 99% - 75%: {avg_dist3}')
-    print(f'Range 25% - 1%: {avg_dist4}\n\n')
-
-    avg_dist1 = df.loc[timeframe, 'forecast_quantiles'].apply(lambda x: x[-1] - x[0]).mean()
-    avg_dist2 = df.loc[timeframe, 'forecast_quantiles'].apply(lambda x: x[74] - x[24]).mean()
-    avg_dist3 = df.loc[timeframe, 'forecast_quantiles'].apply(lambda x: x[-1] - x[74]).mean()
-    avg_dist4 = df.loc[timeframe, 'forecast_quantiles'].apply(lambda x: x[24] - x[0]).mean()
-    print(f'Quantile differences for model: '+ model + ' over shown forecast period')
-    print(f'Range 99% - 1%: {avg_dist1}')
-    print(f'Range 75% - 25%: {avg_dist2}')
-    print(f'Range 99% - 75%: {avg_dist3}')
-    print(f'Range 25% - 1%: {avg_dist4}\n')
-    print('-'*100 + '\n')
 
 plt.legend()
 plt.show()

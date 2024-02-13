@@ -77,10 +77,10 @@ data.index = [datetime.strptime(e, '%Y-%m-%d %H:%M:%S') for e in data.index]
 # data = data.iloc[:4*364*24] # take the first 4 years - 1456 days
 
 def runoneday(inp):
-    params = inp
-    df = data
+    params, dayno = inp
+    fc_period = int(554)
+    df = data.iloc[dayno*24:dayno*24+1456*24+24*fc_period]
     # prepare the input/output dataframes
-    fc_period = int((len(df)/24) - 1456)
     Y = np.zeros((1456, 24))
     # Yf = np.zeros((1, 24)) # no Yf for rolling prediction
     for d in range(1456):
@@ -285,33 +285,19 @@ def runoneday(inp):
         np.savetxt(os.path.join(f'../forecasts_probNN_{distribution.lower()}', datetime.strftime(df.index[-24], '%Y-%m-%d')), pred, delimiter=',', fmt='%.3f')
         print(predDF)
 
-optuna.logging.get_logger('optuna').addHandler(logging.StreamHandler(sys.stdout))
-study_name = f'FINAL_DE_selection_prob_{distribution.lower()}' # 'on_new_data_no_feature_selection'
-storage_name = f'sqlite:////home/ahaas/BachelorThesis/trialfiles/{study_name}{trial}'
+with open(f'/home/ahaas/BachelorThesis/params_trial_{distribution}{trial}.json', 'r') as j:
+    best_params = json.load(j)
 
-summaries = optuna.get_all_study_summaries(storage=storage_name)
-for summary in summaries:
-    print(summary.study_name)
-
-study = optuna.load_study(study_name=study_name, storage=storage_name)
-#print(study.trials_dataframe())
-
-table_names = study.get_trials()
-#print(table_names)
-
-best_params = study.best_params
 print(best_params)
 
-inputList = [(best_params, day) for day in range(0, len(data) // 24 - 1456, 28)]
-inputList = inputList[-180:]
-#inputlist = [(best_params, day) for day in range(len(data) // 24 - 1456)]
-print(len(inputList))
+#inputList = [(best_params, day) for day in range(0, len(data) // 24 - 1456, 28)]
+inputlist = [(best_params, day) for day in range(len(data) // 24 - 1456)]
+inputlist = inputlist[182]
+print(len(inputlist))
 
-print(os.cpu_count())
+runoneday(inputlist)
 
 #with Pool(8) as p:
 #    _ = p.map(runoneday, inputList)
 #for list in reversed(inputList):
 #    runoneday(list)
-
-runoneday(best_params)

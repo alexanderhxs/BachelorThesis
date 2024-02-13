@@ -45,13 +45,14 @@ print(f'Directory: {folder}/distparams_leadNN2.2_{distribution.lower()}_{trial}'
 
 def runoneday(inp):
     params, dayno = inp
-    df = data
+    fc_period = int(24 * 554)
+    df = data.iloc[dayno * 24:dayno * 24 + 1456 * 24 + fc_period]
     # prepare the input/output dataframes
     Y = df.iloc[:, 0].to_numpy()
-    Y = Y[7*24:(1456*24)]# skip first 7 days
-    fc_period = int(len(df)/24 - 1456)
-    X = np.zeros((1456 + fc_period, 221))
-    for d in range(7, 1456+fc_period):
+    Y = Y[7 * 24:(1456 * 24)]  # skip first 7 days
+
+    X = np.zeros((1456 + fc_period//24, 221))
+    for d in range(7, 1456 + fc_period//24):
         X[d, :24] = df.iloc[(d-1)*24:d*24, 0] # D-1 price
         X[d, 24:48] = df.iloc[(d-2)*24:(d-1)*24, 0] # D-2 price
         X[d, 48:72] = df.iloc[(d-3)*24:(d-2)*24, 0] # D-3 price
@@ -103,8 +104,8 @@ def runoneday(inp):
     X = np.repeat(X, 24, axis=0)
     X = np.column_stack((X, lead_col))
     X = X[:, colmask]
-    Xf = X[-fc_period*24:, :]
-    X = X[(7*24):-fc_period*24, :]
+    Xf = X[-fc_period:, :]
+    X = X[(7*24):-fc_period, :]
 
     inputs = keras.Input(X.shape[1])
     last_layer = keras.layers.BatchNormalization()(inputs)
@@ -214,6 +215,12 @@ def runoneday(inp):
             json.dump(fc, open(os.path.join(f'{folder}/distparams_leadNN2.2_{distribution.lower()}_{trial}', datetime.strftime(df.index[24*(index - Xf.shape[0]//24)], '%Y-%m-%d')), 'w'))
         return hist.history['loss'], hist.history['val_loss']
 
+        #params = {k: v.numpy().tolist() for k, v in getters.items()}
+        #print(params)
+        #with open(os.path.join(f'{folder}/distparams_leadNN2.2_{distribution.lower()}_{trial}',
+        #                       datetime.strftime(df.index[-24], '%Y-%m-%d')), 'w') as j:
+        #    json.dump(params, j)
+
 inputlist = [(params, day) for day in range(len(data) // 24 - 1456)]
 
 start_time = datetime.now()
@@ -225,7 +232,7 @@ print(f'Program started at {start_time.strftime("%Y-%m-%d %H:%M:%S")}')
 #    _ = (p.map(runoneday, inputlist))
 #for list in inputlist:
 #    runoneday(list)
-runoneday(inputlist[0])
+runoneday(inputlist[182])
 
 end_time = datetime.now()
 compute_time = (end_time - start_time).total_seconds()

@@ -16,7 +16,7 @@ except:
 distribution = 'Normal'
 num_runs = 1
 num_runs2 = 0
-outlier_threshold = 4
+outlier_threshold = 6
 quantile_array = np.arange(0.01, 1, 0.01)
 
 def pinball_score(observed, pred_quantiles):
@@ -29,7 +29,7 @@ param_dfs2 = []
 #load data
 for num in range(num_runs):
     if num_runs == 1:
-        file_path = f'/home/ahaas/BachelorThesis/distparams_probNN_{distribution.lower()}_3'
+        file_path = f'/home/ahaas/BachelorThesis/distparams_leadNN3.1_{distribution.lower()}_1'
     else:
         file_path = f'/home/ahaas/BachelorThesis/distparams_leadNN1_{distribution.lower()}_{num + 3}'
     dist_file_list = sorted(os.listdir(file_path))
@@ -62,19 +62,25 @@ for num in range(num_runs2):
 
     param_dfs2.append(dist_params.add_suffix(f'_{num+1}'))
 data.index = pd.to_datetime(data.index)
+
+for num, df in enumerate(param_dfs):
+    param_dfs[num] = df.iloc[-24*554:, :]
+for num, df in enumerate(param_dfs2):
+    param_dfs2[num] = df.iloc[-24*554:, :]
 def plotting(y, loc_series, crps_observations, quantiles, loc_series2=None, crps_observations2=None):
     plt.plot(y.index, pd.Series(crps_observations).rolling(window=24 * 7).mean(), label='CRPS over fc rolling window',
              color='blue', linewidth=1)
     plt.plot(y.index, (np.sqrt((y.values - loc_series) ** 2)).rolling(window=24 * 7).mean(),
              label='RSME over fc roling window', color='darkgrey', linestyle='--', linewidth=1)
     if not (loc_series2 is None and crps_observations2 is None):
-        plt.plot(y.index, pd.Series(crps_observations2[:len(crps_observations)]).rolling(window=24 * 7).mean(), label='CRPS over fc single period (2)',
+        plt.plot(y.index, pd.Series(crps_observations2[:len(crps_observations)]).rolling(window=24 * 7).mean(), label='CRPS over fc single period',
              color='orange', linewidth=1)
         plt.plot(y.index, (np.sqrt((y.values - loc_series2[:len(loc_series)]) ** 2)).rolling(window=24 * 7).mean(),
-                 label='RSME over fc single period (2)', color='lightgrey', linestyle='--', linewidth=1)
+                 label='RSME over fc single period', color='lightgrey', linestyle='--', linewidth=1)
     plt.xticks(rotation=45)
     plt.legend()
     #plt.xlim(pd.Timestamp('2019-01-01'), pd.Timestamp('2019-04-30'))
+    plt.title('LeadNN comparison of trial 3')
     plt.show()
 
     lead_crsps = []

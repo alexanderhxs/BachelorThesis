@@ -3,18 +3,41 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import json
+import seaborn as sns
 
 #load data
 data = pd.read_csv('/home/ahaas/BachelorThesis/Datasets/DE.csv', index_col=0)
-data = data.iloc[:, 0]
 data.index = pd.to_datetime(data.index, format='%Y-%m-%d %H:%M:%S')
-plt_data = data.groupby(data.index.hour).agg(list)
+plt_data = data.iloc[:, 0].groupby(data.index.hour).agg(list)
+q_05_data = plt_data.apply(lambda x: np.percentile(x, 5))
+q_95_data = plt_data.apply(lambda x: np.percentile(x, 95))
+q_25_data = plt_data.apply(lambda x: np.percentile(x, 25))
+q_75_data = plt_data.apply(lambda x: np.percentile(x, 75))
+q_50_data = plt_data.apply(lambda x: np.percentile(x, 50))
+q_99_data = plt_data.apply(lambda x: np.percentile(x, 99.9))
+q_01_data = plt_data.apply(lambda x: np.percentile(x, 0.1))
+var_data = plt_data.apply(lambda x: np.std(x))
+plt.figure(figsize=(10, 6), dpi=600)
 plt.violinplot(plt_data,
-               showmeans=True,
-                showextrema=True,
-                quantiles=[[.05, .95] for _ in range(len(plt_data))])
-plt.plot(range(1,25), plt_data.apply(np.mean), linewidth=1)
+                   showmeans=False,
+                   showextrema=True)
+plt.plot(range(1,25), plt_data.apply(np.mean), linewidth=1, label='Mean')
+plt.plot(range(1,25), q_05_data, linewidth=.8, color='grey', linestyle='--', label='90% percentile band')
+plt.plot(range(1,25), q_95_data, linewidth=.8, color='grey', linestyle='--')
+
+plt.title('Violonplot of Price by Hour')
+plt.legend(loc='upper left')
+#plt.xticks(range(1, 8), ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'])
+plt.xticks(range(1, 25))
+plt.xlabel('Hour')
+plt.ylabel('Price\n(EUR/MWh)')
 plt.show()
+
+print(str(q_75_data.mean() - q_50_data.mean()))
+print(str(q_99_data.mean() - q_50_data.mean()))
+print(str(q_50_data.mean() - q_25_data.mean()))
+print(str(q_50_data.mean() - q_01_data.mean()))
+print(str(var_data))
 
 #load params
 filepath = '/home/ahaas/BachelorThesis/distparams_leadNN_normal_4'
@@ -36,7 +59,7 @@ def violon_per_hour(dist_params, parameter):
     plt.violinplot(data,
                    showmeans=True,
                    showextrema=True,
-                   quantiles=[[.05, .95] for _ in range(len(data))])
+                   quantiles=[[.05, .25, .75, .95] for _ in range(len(data))])
     plt.plot(range(1, 25), dist_params[parameter].groupby(dist_params.index.hour).mean(), linewidth= 1)
     plt.show()
     #if not os.path.exists('/home/ahaas/BachelorThesis/Plots'):

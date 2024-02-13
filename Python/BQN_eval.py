@@ -30,9 +30,9 @@ quant_dfs = []
 for num in range(num_runs):
 
     if num_runs == 1:
-        file_path = f'/home/ahaas/BachelorThesis/forecasts_probNN_BQN2_0'
+        file_path = f'/home/ahaas/BachelorThesis/forecasts_probNN_BQN2_0_8'
     else:
-        file_path = f'/home/ahaas/BachelorThesis/forecasts_probNN_BQN_{num + 1}'
+        file_path = f'/home/ahaas/BachelorThesis/forecasts_probNN_BQN_{num + 1}_8'
     dist_file_list = sorted(os.listdir(file_path))
     print(file_path)
 
@@ -44,12 +44,15 @@ for num in range(num_runs):
 
     quant_dfs.append(fc_df.add_suffix(f'_{num+1}'))
 
-data.index = pd.to_datetime(data.index)
 for num, df in enumerate(quant_dfs):
     df[f'forecast_quantiles_{num + 1}'] = df[f'forecast_quantiles_{num + 1}'].apply(lambda x: re.sub(r'\[\s+', '[', x))
     df[f'forecast_quantiles_{num + 1}'] = df[f'forecast_quantiles_{num + 1}'].apply(lambda x: x.replace(' ', ','))
     df[f'forecast_quantiles_{num + 1}'] = df[f'forecast_quantiles_{num + 1}'].apply(lambda x: re.sub(',+', ',', x))
-    df[f'forecast_quantiles_{num+1}'] = df[f'forecast_quantiles_{num+1}'].apply(ast.literal_eval)
+    df[f'forecast_quantiles_{num + 1}'] = df[f'forecast_quantiles_{num + 1}'].apply(ast.literal_eval)
+    quant_dfs[num] = df
+
+data.index = pd.to_datetime(data.index)
+for num, df in enumerate(quant_dfs):
     y = data.loc[df.index, 'Price']
     crps_obs = [pinball_score(obs, np.array(pred)) for obs, pred in zip(y, df[f'forecast_quantiles_{num+1}'])]
     CRPS = np.mean(crps_obs)
@@ -57,4 +60,18 @@ for num, df in enumerate(quant_dfs):
     mae = np.abs(y.values - median_series).mean()
     print(f'\n\nCRPS for trial {num+1}: {CRPS}')
     print(f'MAE for trial {num+1}: {mae}')
+
+#horizontal (quantile) averaging (q-Ens)
+all_df = quant_dfs[0]
+for df in quant_dfs[1:]:
+    all_df = pd.concat([all_df, df], axis=1)
+
+qEns_quantiles = all_df.apply(np.mean, axis=1)
+qEns_crps_obs = [pinball_score(obs, np.array(pred)) for obs, pred in zip(y, qEns_quantiles.values)]
+qEns_CRPS = np.mean(qEns_crps_obs)
+median_series = qEns_quantiles.apply(lambda x: x[50])
+mae = np.abs(y.values - median_series).mean()
+
+print('q-Ens MAE: ' + str(mae))
+print('q-Ens CRPS: ' + str(np.mean(qEns_CRPS)))
 

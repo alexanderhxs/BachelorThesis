@@ -37,7 +37,7 @@ for num in range(num_runs):
         if num_runs == 1:
             file_path = f'/home/ahaas/BachelorThesis/distparams_leadNN2_{distribution.lower()}_3'
         else:
-            file_path = f'/home/ahaas/BachelorThesis/distparams_leadNN_{distribution.lower()}_{num + 1}'
+            file_path = f'/home/ahaas/BachelorThesis/distparams_leadNN2_{distribution.lower()}_{num + 1}'
         dist_file_list = sorted(os.listdir(file_path))
         print(file_path)
 
@@ -61,10 +61,13 @@ for num in range(num_runs):
 #param_dfs = no_outlier_dfs
 data.index = pd.to_datetime(data.index)
 
+for num, df in enumerate(param_dfs):
+    param_dfs[num] = df.iloc[-24*554:, :]
+
 if distribution.lower() == 'normal':
     for num, df in enumerate(param_dfs):
         num += 1
-        #df = df.iloc[:1000 , :]
+
         quantiles = df.apply(lambda x: sps.norm.ppf(quantile_array, loc=x[f'loc_{num}'], scale=x[f'scale_{num}']), axis=1)
         median_series = df.apply(lambda x: sps.norm.median(loc=x[f'loc_{num}'], scale=x[f'scale_{num}']), axis=1)
         y = data.loc[df.index, 'Price']
