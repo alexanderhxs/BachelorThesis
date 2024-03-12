@@ -13,7 +13,7 @@ try:
 except:
     data = pd.read_csv('/home/ahaas/BachelorThesis/Datasets/DE.csv', index_col=0)
 
-distribution = 'Normal'
+distribution = 'JSU'
 num_runs = 1
 num_runs2 = 0
 outlier_threshold = 6

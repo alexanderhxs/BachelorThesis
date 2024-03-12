@@ -17,7 +17,7 @@ import sqlite3
 #     cty (currently only DE), default: DE
 #     distribution (Normal, StudentT, JSU, SinhArcsinh and NormalInverseGaussian), default: Normal
 
-distribution = 'Normal'
+distribution = 'JSU'
 paramcount = {'Normal': 2,
               'JSU': 4,
               'Point': None}
@@ -80,7 +80,7 @@ def objective(trial):
     # '''
     # input feature selection
     colmask = [False] * INP_SIZE
-    if trial.suggest_categorical('price_D-1', binopt):
+    if trial.suggest_categorical('price_D-1', [True]):
         colmask[0] = True
     if trial.suggest_categorical('price_D-2', binopt):
         colmask[1] = True
@@ -88,13 +88,13 @@ def objective(trial):
         colmask[2] = True
     if trial.suggest_categorical('price_D-7', binopt):
         colmask[3] = True
-    if trial.suggest_categorical('load_D', binopt):
+    if trial.suggest_categorical('load_D', [True]):
         colmask[4] = True
     if trial.suggest_categorical('load_D-1', binopt):
         colmask[5] = True
     if trial.suggest_categorical('load_D-7', binopt):
         colmask[6] = True
-    if trial.suggest_categorical('RES_D', binopt):
+    if trial.suggest_categorical('RES_D', [True]):
         colmask[7] = True
     if trial.suggest_categorical('RES_D-1', binopt):
         colmask[8] = True
@@ -216,7 +216,7 @@ def objective(trial):
     return np.mean(metrics_sub)
 
 optuna.logging.get_logger('optuna').addHandler(logging.StreamHandler(sys.stdout))
-study_name = f'FINAL_DE_selection_lead_{distribution.lower()}_2'
+study_name = f'FINAL_DE_selection_lead_{distribution.lower()}_1'
 storage_directory = '/home/ahaas/BachelorThesis/trialfiles'
 
 os.makedirs(storage_directory, exist_ok=True)
@@ -233,7 +233,7 @@ try:
     print(f'Trials so far: {len(study.trials)}')
 except:
     print('Study not existing')
-study.optimize(objective, n_trials=128, show_progress_bar=True, n_jobs=8)
+study.optimize(objective, n_trials=128, show_progress_bar=True, n_jobs=4)
 best_params = study.best_params
 print(best_params)
 best_trial = study.best_trial
