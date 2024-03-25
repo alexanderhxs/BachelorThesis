@@ -13,7 +13,7 @@ try:
 except:
     data = pd.read_csv('/home/ahaas/BachelorThesis/Datasets/DE.csv', index_col=0)
 
-distribution = 'Normal'
+distribution = 'JSU'
 num_runs = 4
 quantile_array = np.arange(0.01, 1, 0.01)
 
@@ -158,7 +158,7 @@ elif distribution.lower() == 'jsu':
         print(f'Run Nr {num}')
         print('Observations: ' + str(len(y)) + '\n')
         print('MAE: ' + str(mae) + '\n' + 'RMSE: ' + str(rmse))
-        print('CRPS: ' + str(np.mean(crps_observations)) + '\n\n')
+        print(f'CRPS: {(np.mean(crps_observations))}\n\n')
 
     #q-Ens averaging (horizontal) via quantile averaging
     quantiles_runs = param_dfs[0].apply(lambda x: sps.johnsonsu.ppf(quantile_array, loc=x[f'loc_1'], scale=x[f'scale_1'], a=x[f'skewness_1'], b=x['tailweight_1']),

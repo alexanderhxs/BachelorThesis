@@ -12,7 +12,7 @@ from multiprocessing import Pool
 import json
 
 distribution = 'Normal'
-trial = 1
+trial = 2
 print(f'Distribution: {distribution} \nTrial: {trial}')
 paramcount = {'Normal': 2,
               'JSU': 4,
@@ -36,13 +36,16 @@ except:
 data.index = [datetime.strptime(e, '%Y-%m-%d %H:%M:%S') for e in data.index]
 
 #create directory
-if not os.path.exists(f'{folder}/distparams_leadNN3.1_{distribution.lower()}_{trial}'):
-    os.mkdir(f'{folder}/distparams_leadNN3.1_{distribution.lower()}_{trial}')
-print(f'Directory: {folder}/distparams_leadNN3.1_{distribution.lower()}_{trial}')
+if not os.path.exists(f'{folder}/distparams_leadNN3.2_{distribution.lower()}_{trial}'):
+    os.mkdir(f'{folder}/distparams_leadNN3.2_{distribution.lower()}_{trial}')
+print(f'Directory: {folder}/distparams_leadNN3.2_{distribution.lower()}_{trial}')
 def runoneday(inp):
     params, dayno = inp
-    fc_period = int(24*554)
+    fc_period = int(24)
     df = data.iloc[dayno*24:dayno*24+1456*24+fc_period]
+
+    if os.path.exists(os.path.join(f'{folder}/distparams_leadNN3.2_{distribution.lower()}_{trial}', datetime.strftime(df.index[-24], '%Y-%m-%d'))):
+        return
     # prepare the input/output dataframes
     Y = df.iloc[:, 0].to_numpy()
     Y = Y[7*24:(1456*24)] # skip first 7 days
@@ -191,8 +194,8 @@ def runoneday(inp):
     #cutting down X to safe fitting time
     #cutter = X.shape[0] * np.random.random_sample(1456-7)
     #X = X[cutter.astype(int), :]
-    #X = X[-1500:, :]
-    #Y = Y[-1500:]
+    X = X[-1500:, :]
+    Y = Y[-1500:]
     callbacks = [keras.callbacks.EarlyStopping(patience=50, restore_best_weights=True)]
     perm = np.random.permutation(np.arange(X.shape[0]))
     VAL_DATA = .2
@@ -208,27 +211,21 @@ def runoneday(inp):
         elif distribution in {'JSU', 'SinhArcsinh', 'NormalInverseGaussian'}:
             getters = {'loc': dist.loc, 'scale': dist.scale,
                        'tailweight': dist.tailweight, 'skewness': dist.skewness}
-        #params = {k: v.numpy().tolist() for k, v in getters.items()}
-        #print(params)
-        #with open(os.path.join(f'{folder}/distparams_leadNN1.2_{distribution.lower()}_{trial}', datetime.strftime(df.index[-24], '%Y-%m-%d')),'w') as j:
-        #    json.dump(params, j)
-        fc_list = [{k: v.numpy().tolist()[day*24:(day+1)*24] for k, v in getters.items()} for day in range(Xf.shape[0]//24)]
-        print(fc_list)
+        params = {k: v.numpy().tolist() for k, v in getters.items()}
+        print(datetime.strftime(df.index[-24], '%Y-%m-%d'))
+        print(params)
+        with open(os.path.join(f'{folder}/distparams_leadNN3.2_{distribution.lower()}_{trial}', datetime.strftime(df.index[-24], '%Y-%m-%d')),'w') as j:
+            json.dump(params, j)
 
-        for index, fc in enumerate(fc_list):
-            json.dump(fc, open(os.path.join(f'{folder}/distparams_leadNN3.1_{distribution.lower()}_{trial}', datetime.strftime(df.index[24*(index - Xf.shape[0]//24)], '%Y-%m-%d')), 'w'))
 
-inputlist = [(params, day) for day in range(len(data) // 24 - 1456)]
+inputlist = [(params, day) for day in range(182, len(data) // 24 - 1456)]
 
 start_time = datetime.now()
 print(f'Program started at {start_time.strftime("%Y-%m-%d %H:%M:%S")}')
 
-#with Pool(8) as p:
-#    _ = p.map(runoneday, inputlist)
-#for list in inputlist:
-#    runoneday(list)
-
-runoneday(inputlist[182])
+if __name__ == '__main__':
+    with Pool(4) as p:
+        _ = p.map(runoneday, inputlist)
 
 end_time = datetime.now()
 compute_time = (end_time - start_time).total_seconds()

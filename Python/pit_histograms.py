@@ -8,8 +8,8 @@ import re
 import ast
 
 #define evaluated models
-fcs = {'BQN_AllInp': '/home/ahaas/BachelorThesis/forecasts_probNN_BQN2_0',
-       #'Normal_3': '/home/ahaas/BachelorThesis/distparams_leadNN_normal_3'
+fcs = {#'BQN_AllInp': '/home/ahaas/BachelorThesis/forecasts_probNN_BQN2_0',
+       'Normal_3': '/home/ahaas/BachelorThesis/distparams_probNN_normal_3'
        }
 
 #get data
@@ -72,5 +72,8 @@ for idx, (model, filepath) in enumerate(fcs.items()):
         bin_counts[bin_index] += 1
 
     normalized_bin_counts = bin_counts/sum(bin_counts)
+    plt.figure(figsize=(10, 6), dpi=600)
+    plt.ylabel('Share of bin')
+    plt.xlabel('bins')
     plt.bar(range(100), normalized_bin_counts)
     plt.show()

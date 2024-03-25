@@ -24,33 +24,11 @@ print(sys.executable)
 distribution = 'Normal'
 
 trial = 0
-d_degree = 8
+d_degree = 12
 
-params = {'Coal': True,
-          'Dummy': True,
-          'EUA': True,
-          'Gas': True,
-          'Oil': True,
-          'RES_D': True,
-          'RES_D-1': True,
-          'activation_1': 'softplus',
-          'activation_2': 'softplus',
-          'dropout': True,
-          'dropout_rate': 0.0001,
-          'learning_rate': 0.0001,
-          'load_D': True,
-          'load_D-1': True,
-          'load_D-7': False,
-          'neurons_1': 1024,
-          'neurons_2': 1024,
-          'price_D-1': True,
-          'price_D-2': True,
-          'price_D-3': False,
-          'price_D-7': True,
-          'regularize_h1_activation': False,
-          'regularize_h1_kernel': False,
-          'regularize_h2_activation': False,
-          'regularize_h2_kernel': False}
+with open(f'/home/ahaas/BachelorThesis/params_trial_BQN_{trial}.json', 'r') as j:
+    params = json.load(j)
+
 
 if not os.path.exists(f'/home/ahaas/BachelorThesis/forecasts_probNN_BQN2_{trial}_8'):
     os.mkdir(f'/home/ahaas/BachelorThesis/forecasts_probNN_BQN2_{trial}_8')

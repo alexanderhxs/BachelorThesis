@@ -216,7 +216,7 @@ def objective(trial):
     return np.mean(metrics_sub)
 
 optuna.logging.get_logger('optuna').addHandler(logging.StreamHandler(sys.stdout))
-study_name = f'FINAL_DE_selection_lead_{distribution.lower()}_1'
+study_name = f'FINAL_DE_selection_lead_{distribution.lower()}_4'
 storage_directory = '/home/ahaas/BachelorThesis/trialfiles'
 
 os.makedirs(storage_directory, exist_ok=True)

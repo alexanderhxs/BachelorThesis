@@ -16,7 +16,7 @@ except:
 distribution = 'JSU'
 num_runs = 1
 num_runs2 = 0
-outlier_threshold = 6
+outlier_threshold = 1000
 quantile_array = np.arange(0.01, 1, 0.01)
 
 def pinball_score(observed, pred_quantiles):
@@ -29,7 +29,7 @@ param_dfs2 = []
 #load data
 for num in range(num_runs):
     if num_runs == 1:
-        file_path = f'/home/ahaas/BachelorThesis/distparams_leadNN3.1_{distribution.lower()}_1'
+        file_path = f'/home/ahaas/BachelorThesis/distparams_leadNN3.1_{distribution.lower()}_3'
     else:
         file_path = f'/home/ahaas/BachelorThesis/distparams_leadNN1_{distribution.lower()}_{num + 3}'
     dist_file_list = sorted(os.listdir(file_path))
@@ -46,7 +46,7 @@ for num in range(num_runs):
     param_dfs.append(dist_params.add_suffix(f'_{num+1}'))
 for num in range(num_runs2):
     if num_runs2 == 1:
-        file_path = f'/home/ahaas/BachelorThesis/distparams_leadNN2_{distribution.lower()}_3'
+        file_path = f'/home/ahaas/BachelorThesis/distparams_probNN3_{distribution.lower()}_3'
     else:
         file_path = f'/home/ahaas/BachelorThesis/distparams_leadNN1_{distribution.lower()}_{num + 3}'
     dist_file_list = sorted(os.listdir(file_path))
@@ -67,22 +67,29 @@ for num, df in enumerate(param_dfs):
     param_dfs[num] = df.iloc[-24*554:, :]
 for num, df in enumerate(param_dfs2):
     param_dfs2[num] = df.iloc[-24*554:, :]
-def plotting(y, loc_series, crps_observations, quantiles, loc_series2=None, crps_observations2=None):
-    plt.plot(y.index, pd.Series(crps_observations).rolling(window=24 * 7).mean(), label='CRPS over fc rolling window',
-             color='blue', linewidth=1)
-    plt.plot(y.index, (np.sqrt((y.values - loc_series) ** 2)).rolling(window=24 * 7).mean(),
-             label='RSME over fc roling window', color='darkgrey', linestyle='--', linewidth=1)
-    if not (loc_series2 is None and crps_observations2 is None):
-        plt.plot(y.index, pd.Series(crps_observations2[:len(crps_observations)]).rolling(window=24 * 7).mean(), label='CRPS over fc single period',
-             color='orange', linewidth=1)
-        plt.plot(y.index, (np.sqrt((y.values - loc_series2[:len(loc_series)]) ** 2)).rolling(window=24 * 7).mean(),
-                 label='RSME over fc single period', color='lightgrey', linestyle='--', linewidth=1)
-    plt.xticks(rotation=45)
-    plt.legend()
-    #plt.xlim(pd.Timestamp('2019-01-01'), pd.Timestamp('2019-04-30'))
-    plt.title('LeadNN comparison of trial 3')
+def plotting(y, crps_observations, crps_observations2=None):
+    plt.figure(figsize=(10, 6), dpi=600)
+    plt.plot(y.index, pd.Series(crps_observations).rolling(window=24 * 7).mean(), label='CRPS with rolling window',
+             color='skyblue', linewidth=2)
+    #plt.plot(y.index, (np.sqrt((y.values - loc_series) ** 2)).rolling(window=24 * 7).mean(),
+    #         label='RSME over fc roling window', color='darkgrey', linestyle='--', linewidth=1)
+    if not (crps_observations2 is None):
+        plt.plot(y.index, pd.Series(crps_observations2[:len(crps_observations)]).rolling(window=24 * 7).mean(), label='CRPS with single period',
+             color='coral', linewidth=2, linestyle='--')
+    #    plt.plot(y.index, (np.sqrt((y.values - loc_series2[:len(loc_series)]) ** 2)).rolling(window=24 * 7).mean(),
+    #             label='RSME over fc single period', color='lightgrey', linestyle='--', linewidth=1)
+    plt.grid(axis='y', linestyle='--', alpha=0.7)
+    plt.ylabel('Smoothed CRPS', fontsize=14)
+    plt.yticks(fontsize=12)
+    plt.xticks(rotation=45, fontsize=12)
+    plt.xlabel('Test Period', fontsize=14)
+    plt.legend(fontsize=14)
+    plt.subplots_adjust(bottom=0.2)
+    plt.tight_layout()
+
     plt.show()
 
+def plot_lead_bar(y, loc_series, crps_observations, quantiles):
     lead_crsps = []
     lead_mae = []
     lead_rsme = []
@@ -147,12 +154,12 @@ if distribution.lower() == 'normal':
         print('MAE: ' + str(mae) + '\n' + 'RMSE: ' + str(rmse))
         print('CRPS: ' + str(np.mean(crps_observations)) + '\n\n')
 
-        plotting(y, df[f'loc_{num}'], crps_observations, quantiles)
+        #plotting(y, df[f'loc_{num}'], crps_observations, quantiles)
         for num2, df2 in enumerate(param_dfs2):
             quantiles2 = df2.apply(lambda x: sps.norm.ppf(quantile_array, loc=x[f'loc_{num}'], scale=x[f'scale_{num}']), axis=1)
             crps_observations2 = [pinball_score(observed, quantiles_row) for observed, quantiles_row in zip(y, quantiles2)]
 
-            plotting(y, df[f'loc_{num}'], crps_observations, quantiles, crps_observations2=crps_observations2, loc_series2=df2[f'loc_{num}'])
+            plotting(y, crps_observations, crps_observations2=crps_observations2)
 
 
 
@@ -214,3 +221,38 @@ if distribution.lower() == 'normal':
                 plotting(y, mean_series, pEns_crps_observations, pEns_quantiles)
 
 
+
+if distribution.lower() == 'jsu':
+    for num, df in enumerate(param_dfs):
+        num += 1
+        quantiles = df.apply(lambda x: sps.johnsonsu.ppf(quantile_array, loc=x[f'loc_{num}'], scale=x[f'scale_{num}'], a=x[f'skewness_{num}'], b=x[f'tailweight_{num}']), axis=1)
+        median_series = df.apply(lambda x: sps.johnsonsu.median(loc=x[f'loc_{num}'], scale=x[f'scale_{num}'], a=x[f'skewness_{num}'],
+                                           b=x[f'tailweight_{num}']), axis=1)
+        y = data.loc[df.index, 'Price']
+        crps_observations = [pinball_score(observed, quantiles_row) for observed, quantiles_row in zip(y, quantiles)]
+
+        df['crps'] = crps_observations
+        df['crps'] = df['crps'].rolling(1).mean()
+        outlier_mask = df['crps'] > outlier_threshold
+        outlier_df = df.loc[outlier_mask]
+        print(outlier_df)
+
+        dd = data[(data.index > '2020-09-01') & (data.index < '2020-10-01')]
+        print(data['Price'].min())
+        print(data['Price'].max())
+
+        mae = np.abs(y.values - median_series).mean()
+        rmse = np.sqrt((y.values - df[f'loc_{num}']) ** 2).mean()
+        print(f'Overall results for run Nr {num}')
+        print('Observations: ' + str(len(y)) + '\n')
+        print('MAE: ' + str(mae) + '\n' + 'RMSE: ' + str(rmse))
+        print('CRPS: ' + str(np.mean(crps_observations)) + '\n\n')
+
+        plotting(y, crps_observations)
+
+        #plotting(y, df[f'loc_{num}'], crps_observations, quantiles)
+        for num2, df2 in enumerate(param_dfs2):
+            quantiles2 = df2.apply(lambda x: sps.norm.ppf(quantile_array, loc=x[f'loc_{num}'], scale=x[f'scale_{num}']), axis=1)
+            crps_observations2 = [pinball_score(observed, quantiles_row) for observed, quantiles_row in zip(y, quantiles2)]
+
+            plotting(y, df[f'loc_{num}'], crps_observations)
