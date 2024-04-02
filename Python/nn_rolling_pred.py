@@ -21,8 +21,8 @@ import json
 print('\n')
 print(sys.executable)
 
-distribution = 'JSU'
-trial = 2
+distribution = 'Normal'
+trial = 1
 paramcount = {'Normal': 2,
               'StudentT': 3,
               'JSU': 4,
@@ -79,6 +79,9 @@ data.index = [datetime.strptime(e, '%Y-%m-%d %H:%M:%S') for e in data.index]
 def runoneday(inp):
     params, dayno = inp
     df = data.iloc[dayno*24:dayno*24+1456*24+24]
+
+    if os.path.exists(os.path.join(f'/home/ahaas/BachelorThesis/distparams_probNN_{distribution.lower()}_{trial}', datetime.strftime(df.index[-24], '%Y-%m-%d'))):
+        return
     # prepare the input/output dataframes
     Y = np.zeros((1456, 24))
     # Yf = np.zeros((1, 24)) # no Yf for rolling prediction
@@ -307,5 +310,5 @@ print(len(inputlist))
 #     _ = runoneday(e)
 print(os.cpu_count())
 #if __name__ == '__main__':
-with Pool(8) as p:
+with Pool(4) as p:
     _ = p.map(runoneday, inputlist)

@@ -11,8 +11,8 @@ import os
 from multiprocessing import Pool
 import json
 
-distribution = 'Normal'
-trial = 2
+distribution = 'JSU'
+trial = 4
 print(f'Distribution: {distribution} \nTrial: {trial}')
 paramcount = {'Normal': 2,
               'JSU': 4,

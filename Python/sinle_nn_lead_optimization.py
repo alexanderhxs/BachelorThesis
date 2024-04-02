@@ -114,107 +114,130 @@ def objective(trial):
     Ywhole = Y.copy()
     Yfwhole = Yf.copy()
     metrics_sub = []
-    for train_no in range(val_multi):
-        start = val_window * train_no
-        X = Xwhole[start*24:1092*24+start*24, :]
-        Xf = Xwhole[1092*24+start*24:1092*24+start*24+val_window*24, :]
-        Y = Ywhole[start*24:1092*24+start*24]
-        Yf = Ywhole[1092*24+start*24:1092*24+start*24+val_window*24]
-        X = X[7*24:1092*24, :]
-        Y = Y[7*24:1092*24]
 
-        for tm in range(24):
-            X_tm = X[tm::24]
-            Y_tm = Y[tm::24]
-            Xf_tm = Xf[tm::24]
-            Yf_tm = Yf[tm::24]
-            # begin building a model
-            inputs = keras.Input(X.shape[1]) # <= INP_SIZE as some columns might have been turned off
-            # batch normalization
-            # we decided to always normalize the inputs
-            batchnorm = True #trial.suggest_categorical('batch_normalization', [True, False])
-            if batchnorm:
-                norm = keras.layers.BatchNormalization()(inputs)
-                last_layer = norm
-            else:
-                last_layer = inputs
-            # dropout
-            dropout = trial.suggest_categorical('dropout', binopt)
-            if dropout:
-                rate = trial.suggest_float('dropout_rate', 0, 1)
-                drop = keras.layers.Dropout(rate)(last_layer)
-                last_layer = drop
-            # regularization of 1st hidden layer,
-            #activation - output, kernel - weights/parameters of input
-            regularize_h1_activation = trial.suggest_categorical('regularize_h1_activation', binopt)
-            regularize_h1_kernel = trial.suggest_categorical('regularize_h1_kernel', binopt)
-            h1_activation_rate = (0.0 if not regularize_h1_activation
-                                  else trial.suggest_float('h1_activation_rate_l1', 1e-5, 1e1, log=True))
-            h1_kernel_rate = (0.0 if not regularize_h1_kernel
-                              else trial.suggest_float('h1_kernel_rate_l1', 1e-5, 1e1, log=True))
-            # define 1st hidden layer with regularization
-            hidden = keras.layers.Dense(trial.suggest_int('neurons_1', 16, 256, log=False),
-                                        activation=trial.suggest_categorical('activation_1', activations),
-                                        # kernel_initializer='ones',
-                                        kernel_regularizer=keras.regularizers.L1(h1_kernel_rate),
-                                        activity_regularizer=keras.regularizers.L1(h1_activation_rate))(last_layer)
-            # regularization of 2nd hidden layer,
-            #activation - output, kernel - weights/parameters of input
-            regularize_h2_activation = trial.suggest_categorical('regularize_h2_activation', binopt)
-            regularize_h2_kernel = trial.suggest_categorical('regularize_h2_kernel', binopt)
-            h2_activation_rate = (0.0 if not regularize_h2_activation
-                                  else trial.suggest_float('h2_activation_rate_l1', 1e-5, 1e1, log=True))
-            h2_kernel_rate = (0.0 if not regularize_h2_kernel
-                              else trial.suggest_float('h2_kernel_rate_l1', 1e-5, 1e1, log=True))
-            # define 2nd hidden layer with regularization
-            hidden = keras.layers.Dense(trial.suggest_int('neurons_2', 16, 256, log=False),
-                                        activation=trial.suggest_categorical('activation_2', activations),
-                                        # kernel_initializer='ones',
-                                        kernel_regularizer=keras.regularizers.L1(h2_kernel_rate),
-                                        activity_regularizer=keras.regularizers.L1(h2_activation_rate))(hidden)
+    params_suggested = {
+        'dropout': trial.suggest_categorical('dropout', binopt),
+        'dropout_rate': trial.suggest_float('dropout_rate', 0, 1),
+        'regularize_h1_activation': trial.suggest_categorical('regularize_h1_activation', binopt),
+        'regularize_h1_kernel': trial.suggest_categorical('regularize_h1_kernel', binopt),
+        'h1_activation_rate_l1': trial.suggest_float('h1_activation_rate_l1', 1e-5, 1e1, log=True),
+        'h1_kernel_rate_l1': trial.suggest_float('h1_kernel_rate_l1', 1e-5, 1e1, log=True),
+        'neurons_1': trial.suggest_int('neurons_1', 16, 256, log=False),
+        'activation_1': trial.suggest_categorical('activation_1', activations),
+        'regularize_h2_activation': trial.suggest_categorical('regularize_h2_activation', binopt),
+        'regularize_h2_kernel': trial.suggest_categorical('regularize_h2_kernel', binopt),
+        'h2_activation_rate_l1': trial.suggest_float('h2_activation_rate_l1', 1e-5, 1e1, log=True),
+        'h2_kernel_rate_l1': trial.suggest_float('h2_kernel_rate_l1', 1e-5, 1e1, log=True),
+        'neurons_2': trial.suggest_int('neurons_2', 16, 256, log=False),
+        'activation_2': trial.suggest_categorical('activation_2', activations),
+        'regularize_loc': trial.suggest_categorical('regularize_loc', binopt),
+        'regularize_scale': trial.suggest_categorical('regularize_scale' , binopt),
+        'regularize_tailweight': trial.suggest_categorical('regularize_tailweight', binopt),
+        'regularize_skewness': trial.suggest_categorical('regularize_skewness', binopt),
+        'loc_rate_l1': trial.suggest_float('loc_rate_l1', 1e-5, 1e1, log=True),
+        'scale_rate_l1': trial.suggest_float('scale_rate_l1', 1e-5, 1e1, log=True),
+        'tailweight_rate_l1': trial.suggest_float('tailweight_rate_l1', 1e-5, 1e1, log=True),
+        'skewness_rate_l1': trial.suggest_float( 'skewness_rate_l1', 1e-5, 1e1, log=True),
+        'learning_rate': trial.suggest_float('learning_rate', 1e-5, 1e-1, log=True)
+    }
+    X = Xwhole[:1092*24, :]
+    Xf = Xwhole[1092*24:, :]
+    Y = Ywhole[:1092*24]
+    Yf = Ywhole[1092*24:]
+    X = X[7*24:1092*24, :]
+    Y = Y[7*24:1092*24]
+
+    for tm in range(24):
+        X_tm = X[tm::24]
+        Y_tm = Y[tm::24]
+        Xf_tm = Xf[tm::24]
+        Yf_tm = Yf[tm::24]
+        # begin building a model
+        inputs = keras.Input(X.shape[1]) # <= INP_SIZE as some columns might have been turned off
+        # batch normalization
+        # we decided to always normalize the inputs
+        batchnorm = True #trial.suggest_categorical('batch_normalization', [True, False])
+        if batchnorm:
+            norm = keras.layers.BatchNormalization()(inputs)
+            last_layer = norm
+        else:
+            last_layer = inputs
+        # dropout
+        dropout = params_suggested['dropout']
+        if dropout:
+            rate = params_suggested['dropout_rate']
+            drop = keras.layers.Dropout(rate)(last_layer)
+            last_layer = drop
+        # regularization of 1st hidden layer,
+        #activation - output, kernel - weights/parameters of input
+        regularize_h1_activation = params_suggested['regularize_h1_activation']
+        regularize_h1_kernel = params_suggested['regularize_h1_kernel']
+        h1_activation_rate = (0.0 if not regularize_h1_activation
+                              else params_suggested['h1_activation_rate_l1'])
+        h1_kernel_rate = (0.0 if not regularize_h1_kernel
+                          else params_suggested['h1_kernel_rate_l1'])
+        # define 1st hidden layer with regularization
+        hidden = keras.layers.Dense(params_suggested['neurons_1'],
+                                    activation=params_suggested['activation_1'],
+                                    # kernel_initializer='ones',
+                                    kernel_regularizer=keras.regularizers.L1(h1_kernel_rate),
+                                    activity_regularizer=keras.regularizers.L1(h1_activation_rate))(last_layer)
+        # regularization of 2nd hidden layer,
+        #activation - output, kernel - weights/parameters of input
+        regularize_h2_activation = params_suggested['regularize_h2_activation']
+        regularize_h2_kernel = params_suggested['regularize_h2_kernel']
+        h2_activation_rate = (0.0 if not regularize_h2_activation
+                              else params_suggested['h2_activation_rate_l1'])
+        h2_kernel_rate = (0.0 if not regularize_h2_kernel
+                          else params_suggested['h2_kernel_rate_l1'])
+        # define 2nd hidden layer with regularization
+        hidden = keras.layers.Dense(params_suggested['neurons_2'],
+                                    activation=params_suggested['activation_2'],
+                                    # kernel_initializer='ones',
+                                    kernel_regularizer=keras.regularizers.L1(h2_kernel_rate),
+                                    activity_regularizer=keras.regularizers.L1(h2_activation_rate))(hidden)
 
 
-            # now define parameter layers with their regularization
-            param_layers = []
-            param_names = ["loc", "scale", "tailweight", "skewness"]
-            for p in range(paramcount[distribution]):
-                # regularize_param_kernel = True
-                # param_kernel_rate = 0.1
-                regularize_param_kernel = trial.suggest_categorical('regularize_'+param_names[p], binopt)
-                param_kernel_rate = (0.0 if not regularize_param_kernel
-                                     else trial.suggest_float(param_names[p]+'_rate_l1', 1e-5, 1e1, log=True))
-                param_layers.append(keras.layers.Dense(
-                    1, activation='linear', # kernel_initializer='ones',
-                    kernel_regularizer=keras.regularizers.L1(param_kernel_rate))(hidden))
-            # concatenate the parameter layers to one
-            linear = tf.keras.layers.concatenate(param_layers)
-            # define outputs
-            if distribution == 'Normal':
-                outputs = tfp.layers.DistributionLambda(
-                        lambda t: tfd.Normal(
-                            loc=t[..., 0],
-                            scale = 1e-3 + 3 * tf.math.softplus(t[..., 1])))(linear)
-            elif distribution == 'JSU':
-                outputs = tfp.layers.DistributionLambda(
-                        lambda t: tfd.JohnsonSU(
-                            loc=t[..., 0],
-                            scale=1e-3 + 3 * tf.math.softplus(t[..., 1]),
-                            tailweight= 1 + 3 * tf.math.softplus(t[..., 2]),
-                            skewness=t[..., 3]))(linear)
-            else:
-                raise ValueError(f'Incorrect distribution {distribution}')
-            model = keras.Model(inputs = inputs, outputs=outputs)
-            model.compile(optimizer=keras.optimizers.Adam(trial.suggest_float('learning_rate', 1e-5, 1e-1, log=True)),
-                          loss=lambda y, rv_y: -rv_y.log_prob(y),
-                          metrics='mae')
+        # now define parameter layers with their regularization
+        param_layers = []
+        param_names = ["loc", "scale", "tailweight", "skewness"]
+        for p in range(paramcount[distribution]):
 
-            # define callbacks
-            callbacks = [keras.callbacks.EarlyStopping(patience=50, restore_best_weights=True)]
-            model.fit(X_tm, Y_tm, epochs=1500, validation_data=(Xf_tm, Yf_tm), callbacks=callbacks, batch_size=32, verbose=0)
+            regularize_param_kernel = params_suggested['regularize_'+param_names[p]]
+            param_kernel_rate = (0.0 if not regularize_param_kernel
+                                 else params_suggested[param_names[p]+'_rate_l1'])
+            param_layers.append(keras.layers.Dense(
+                1, activation='linear',
+                kernel_regularizer=keras.regularizers.L1(param_kernel_rate))(hidden))
+        # concatenate the parameter layers to one
+        linear = tf.keras.layers.concatenate(param_layers)
+        # define outputs
+        if distribution == 'Normal':
+            outputs = tfp.layers.DistributionLambda(
+                    lambda t: tfd.Normal(
+                        loc=t[..., 0],
+                        scale = 1e-3 + 3 * tf.math.softplus(t[..., 1])))(linear)
+        elif distribution == 'JSU':
+            outputs = tfp.layers.DistributionLambda(
+                    lambda t: tfd.JohnsonSU(
+                        loc=t[..., 0],
+                        scale=1e-3 + 3 * tf.math.softplus(t[..., 1]),
+                        tailweight= 1 + 3 * tf.math.softplus(t[..., 2]),
+                        skewness=t[..., 3]))(linear)
+        else:
+            raise ValueError(f'Incorrect distribution {distribution}')
+        model = keras.Model(inputs = inputs, outputs=outputs)
+        model.compile(optimizer=keras.optimizers.Adam(params_suggested['learning_rate']),
+                      loss=lambda y, rv_y: -rv_y.log_prob(y),
+                      metrics='mae')
 
-            metrics = model.evaluate(Xf_tm, Yf_tm) # for point its a list of one [loss, MAE]
-            metrics_sub.append(metrics[0])
-            # we optimize the returned value, -1 will always take the model with best MAE
+        # define callbacks
+        callbacks = [keras.callbacks.EarlyStopping(patience=50, restore_best_weights=True)]
+        model.fit(X_tm, Y_tm, epochs=1500, validation_data=(Xf_tm, Yf_tm), callbacks=callbacks, batch_size=32, verbose=0)
+
+        metrics = model.evaluate(Xf_tm, Yf_tm) # for point its a list of one [loss, MAE]
+        metrics_sub.append(metrics[0])
+        # we optimize the returned value, -1 will always take the model with best MAE
     return np.mean(metrics_sub)
 
 optuna.logging.get_logger('optuna').addHandler(logging.StreamHandler(sys.stdout))
@@ -231,11 +254,15 @@ if not os.path.isfile(db_file_path):
     conn.close()
 
 study = optuna.create_study(study_name=study_name, storage=storage_name, load_if_exists=True)
+
+trials_with_value = [trial for trial in study.trials if trial.value is not None]
 try:
-    print(f'Trials so far: {len(study.trials)}')
+    print(f'Trials so far: {len(trials_with_value)}')
+    best_params = study.best_params
+    print(best_params)
 except:
     print('Study not existing')
-study.optimize(objective, n_trials=128, show_progress_bar=True, n_jobs=4)
+study.optimize(objective, n_trials=128-len(trials_with_value), show_progress_bar=True, n_jobs=8)
 best_params = study.best_params
 print(best_params)
 best_trial = study.best_trial

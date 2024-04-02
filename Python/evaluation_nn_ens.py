@@ -15,6 +15,7 @@ except:
 
 distribution = 'JSU'
 num_runs = 4
+outlier_threshold = 1000
 quantile_array = np.arange(0.01, 1, 0.01)
 
 def pinball_score(observed, pred_quantiles):
@@ -30,14 +31,14 @@ for num in range(num_runs):
         if num_runs == 1:
             file_path = f'../distparams_probNN_{distribution.lower()}_2'
         else:
-            file_path = f'../distparams_probNN_{distribution.lower()}_{num+1}'
+            file_path = f'../distparams_probNN3_{distribution.lower()}_{num+1}'
 
         dist_file_list = sorted(os.listdir(file_path))
     except:
         if num_runs == 1:
-            file_path = f'/home/ahaas/BachelorThesis/distparams_leadNN2_{distribution.lower()}_3'
+            file_path = f'/home/ahaas/BachelorThesis/distparams_leadNN3.1_{distribution.lower()}_1'
         else:
-            file_path = f'/home/ahaas/BachelorThesis/distparams_leadNN3.1_{distribution.lower()}_{num + 1}'
+            file_path = f'/home/ahaas/BachelorThesis/distparams_leadNN3.2_{distribution.lower()}_{num + 1}'
         dist_file_list = sorted(os.listdir(file_path))
         print(file_path)
 
@@ -52,13 +53,6 @@ for num in range(num_runs):
 
     param_dfs.append(dist_params.add_suffix(f'_{num+1}'))
 
-#apply mask, to eliminate outliers
-#no_outlier_dfs = []
-#for param_df in param_dfs:
-#    mask = param_df.index.hour == 25
-#    param_df = param_df[~mask]
-#    no_outlier_dfs.append(param_df)
-#param_dfs = no_outlier_dfs
 data.index = pd.to_datetime(data.index)
 
 for num, df in enumerate(param_dfs):
@@ -72,6 +66,7 @@ if distribution.lower() == 'normal':
         median_series = df.apply(lambda x: sps.norm.median(loc=x[f'loc_{num}'], scale=x[f'scale_{num}']), axis=1)
         y = data.loc[df.index, 'Price']
         crps_observations = [pinball_score(observed, quantiles_row) for observed, quantiles_row in zip(y, quantiles)]
+
         mae = np.abs(y.values - median_series).mean()
         rmse = np.sqrt((y.values - df[f'loc_{num}']) ** 2).mean()
         print(f'Run Nr {num}')
@@ -147,18 +142,34 @@ if distribution.lower() == 'normal':
 
 elif distribution.lower() == 'jsu':
 
+    outliers = []
     for num, df in enumerate(param_dfs):
         num += 1
-        quantiles = df.apply(lambda x: sps.johnsonsu.ppf(quantile_array, loc=x[f'loc_{num}'], scale=x[f'scale_{num}'], a=x[f'skewness_{num}'], b=x[f'tailweight_{num}']), axis=1)
-        median_series = df.apply(lambda x: sps.johnsonsu.median(loc=x[f'loc_{num}'], scale=x[f'scale_{num}'], a=x[f'skewness_{num}'], b=x[f'tailweight_{num}']), axis=1)
         y = data.loc[df.index, 'Price']
+        quantiles = df.apply(lambda x: sps.johnsonsu.ppf(quantile_array, loc=x[f'loc_{num}'], scale=x[f'scale_{num}'], a=x[f'skewness_{num}'], b=x[f'tailweight_{num}']), axis=1)
         crps_observations = [pinball_score(observed, quantiles_row) for observed, quantiles_row in zip(y, quantiles)]
+
+        #detect outliers
+        df['crps'] = crps_observations
+        outlier_mask = df['crps'] > outlier_threshold
+        df = df.loc[~outlier_mask]
+        outliers.append(outlier_mask)
+
+        #compute scores without outliers
+        y = data.loc[df.index, 'Price']
+        median_series = df.apply(lambda x: sps.johnsonsu.median(loc=x[f'loc_{num}'], scale=x[f'scale_{num}'], a=x[f'skewness_{num}'], b=x[f'tailweight_{num}']), axis=1)
+
         mae = np.abs(y.values - median_series).mean()
         rmse = np.sqrt((y.values - df[f'loc_{num}']) ** 2).mean()
         print(f'Run Nr {num}')
         print('Observations: ' + str(len(y)) + '\n')
         print('MAE: ' + str(mae) + '\n' + 'RMSE: ' + str(rmse))
-        print(f'CRPS: {(np.mean(crps_observations))}\n\n')
+        print(f'CRPS: {df["crps"].mean()}\n\n')
+
+    #removing all outliers from runs
+    outliers = np.any(outliers, axis=0)
+    for i, df in enumerate(param_dfs):
+        param_dfs[i] = df.loc[~outliers]
 
     #q-Ens averaging (horizontal) via quantile averaging
     quantiles_runs = param_dfs[0].apply(lambda x: sps.johnsonsu.ppf(quantile_array, loc=x[f'loc_1'], scale=x[f'scale_1'], a=x[f'skewness_1'], b=x['tailweight_1']),
@@ -171,11 +182,11 @@ elif distribution.lower() == 'jsu':
         quantiles_runs = pd.merge(quantiles_runs, qs, left_index=True, right_index=True, how='inner')
         loc_runs = pd.merge(loc_runs, df[f'loc_{num}'], left_index=True, right_index=True, how='inner')
 
-    ens_quantiles = quantiles_runs.apply(np.mean, axis=1)
-    y = data.loc[ens_quantiles.index, 'Price']
+    qEns_quantiles = quantiles_runs.apply(np.mean, axis=1)
+    y = data.loc[qEns_quantiles.index, 'Price']
     qEns_crps_observations = [pinball_score(observed, quantiles_row) for observed, quantiles_row in
-                              zip(y, ens_quantiles)]
-    median_series = ens_quantiles.apply(lambda x: x[50])
+                              zip(y, qEns_quantiles)]
+    median_series = qEns_quantiles.apply(lambda x: x[49])
     loc_series = loc_runs.apply(np.mean, axis=1)
 
     qEns_mae = np.abs(y.values - median_series).mean()
@@ -184,6 +195,7 @@ elif distribution.lower() == 'jsu':
     print('q-Ens MAE: ' + str(qEns_mae))
     print('q-Ens RSME: ' + str(qEns_rmse))
     print('q-Ens CRPS: ' + str(np.mean(qEns_crps_observations)))
+    print('q-Ens CRPS:' + str(np.median(qEns_crps_observations)))
 
     # p-Ens averaging (vertical) via sampling
     for sample_size in [50, 100, 250, 500, 1000, 2500]:
@@ -211,3 +223,8 @@ elif distribution.lower() == 'jsu':
         print(f'p-Ens CRPS: {np.mean(pEns_crps_observations)} \n\n')
 else:
     print('Could not calculate scores: Wrong distribution')
+
+if not os.path.exists(f'/home/ahaas/BachelorThesis/forecasts_probNN_{distribution.lower()}_q-Ens'):
+    os.mkdir(f'/home/ahaas/BachelorThesis/forecasts_probNN_{distribution.lower()}_q-Ens')
+
+#qEns_quantiles.to_csv(f'/home/ahaas/BachelorThesis/forecasts_probNN_{distribution.lower()}_q-Ens/predictions.csv')

@@ -21,17 +21,18 @@ import scipy.stats as sps
 
 print('\n')
 print(sys.executable)
-distribution = 'Normal'
 
-trial = 0
+trial = 4
 d_degree = 12
+INP_SIZE = 221
 
 with open(f'/home/ahaas/BachelorThesis/params_trial_BQN_{trial}.json', 'r') as j:
     params = json.load(j)
 
 
-if not os.path.exists(f'/home/ahaas/BachelorThesis/forecasts_probNN_BQN2_{trial}_8'):
-    os.mkdir(f'/home/ahaas/BachelorThesis/forecasts_probNN_BQN2_{trial}_8')
+if not os.path.exists(f'/home/ahaas/BachelorThesis/forecasts_probNN_BQN_{trial}'):
+    os.mkdir(f'/home/ahaas/BachelorThesis/forecasts_probNN_BQN_{trial}')
+print(f'/home/ahaas/BachelorThesis/forecasts_probNN_BQN_{trial}')
 
 # read data file
 try:
@@ -67,37 +68,49 @@ def qt_loss(y_true, y_pred):
     scores = tf.reduce_mean(scores, axis=1)
     return scores
 def bern_quants(alpha):
-    alpha = alpha.reshape(24, d_degree+1)
-    return np.dot(np.cumsum(alpha, axis=1), B)
+    num_predictions, num_coeffs = alpha.shape
+    alpha_reshaped = alpha.reshape(num_predictions, 24, d_degree + 1)
+
+    # Initialize array to store results
+    bernstein_quants = np.zeros((num_predictions, 24, 99))
+
+    # Compute cumulative sum along axis=2 (coefficients)
+    for i in range(num_predictions):
+        cumsum_alpha = np.cumsum(alpha_reshaped[i], axis=1)
+        bernstein_quants[i] = np.dot(cumsum_alpha, B)
+
+    return bernstein_quants
 
 def runoneday(inp):
     params, dayno = inp
-    df = data.iloc[dayno * 24:dayno * 24 + 1456 * 24 + 24]
-    if datetime.strftime(df.index[-24], '%Y-%m-%d') in os.listdir(f'/home/ahaas/BachelorThesis/forecasts_probNN_BQN2_{trial}_8'):
+    fc_period = int(1)
+    df = data.iloc[dayno*24:dayno*24+1456*24+24*fc_period]
+
+    if os.path.exists(os.path.join(f'/home/ahaas/BachelorThesis/forecasts_probNN_BQN_{trial}', datetime.strftime(df.index[-24], '%Y-%m-%d'))):
         return
     # prepare the input/output dataframes
     Y = np.zeros((1456, 24))
     # Yf = np.zeros((1, 24)) # no Yf for rolling prediction
     for d in range(1456):
-        Y[d, :] = df.loc[df.index[d * 24:(d + 1) * 24], 'Price'].to_numpy()
-    Y = Y[7:, :]  # skip first 7 days
+        Y[d, :] = df.loc[df.index[d*24:(d+1)*24], 'Price'].to_numpy()
+    Y = Y[7:, :] # skip first 7 days
     # for d in range(1):
     #     Yf[d, :] = df.loc[df.index[(d+1092)*24:(d+1093)*24], 'Price'].to_numpy()
-    X = np.zeros((1456 + 1, 221))
-    for d in range(7, 1456 + 1):
-        X[d, :24] = df.loc[df.index[(d - 1) * 24:(d) * 24], 'Price'].to_numpy()  # D-1 price
-        X[d, 24:48] = df.loc[df.index[(d - 2) * 24:(d - 1) * 24], 'Price'].to_numpy()  # D-2 price
-        X[d, 48:72] = df.loc[df.index[(d - 3) * 24:(d - 2) * 24], 'Price'].to_numpy()  # D-3 price
-        X[d, 72:96] = df.loc[df.index[(d - 7) * 24:(d - 6) * 24], 'Price'].to_numpy()  # D-7 price
-        X[d, 96:120] = df.loc[df.index[(d) * 24:(d + 1) * 24], df.columns[1]].to_numpy()  # D load forecast
-        X[d, 120:144] = df.loc[df.index[(d - 1) * 24:(d) * 24], df.columns[1]].to_numpy()  # D-1 load forecast
-        X[d, 144:168] = df.loc[df.index[(d - 7) * 24:(d - 6) * 24], df.columns[1]].to_numpy()  # D-7 load forecast
-        X[d, 168:192] = df.loc[df.index[(d) * 24:(d + 1) * 24], df.columns[2]].to_numpy()  # D RES sum forecast
-        X[d, 192:216] = df.loc[df.index[(d - 1) * 24:(d) * 24], df.columns[2]].to_numpy()  # D-1 RES sum forecast
-        X[d, 216] = df.loc[df.index[(d - 2) * 24:(d - 1) * 24:24], df.columns[3]].to_numpy()  # D-2 EUA
-        X[d, 217] = df.loc[df.index[(d - 2) * 24:(d - 1) * 24:24], df.columns[4]].to_numpy()  # D-2 API2_Coal
-        X[d, 218] = df.loc[df.index[(d - 2) * 24:(d - 1) * 24:24], df.columns[5]].to_numpy()  # D-2 TTF_Gas
-        X[d, 219] = data.loc[data.index[(d - 2) * 24:(d - 1) * 24:24], data.columns[6]].to_numpy()  # D-2 Brent oil
+    X = np.zeros((1456+fc_period, INP_SIZE))
+    for d in range(7, 1456+fc_period):
+        X[d, :24] = df.loc[df.index[(d-1)*24:(d)*24], 'Price'].to_numpy() # D-1 price
+        X[d, 24:48] = df.loc[df.index[(d-2)*24:(d-1)*24], 'Price'].to_numpy() # D-2 price
+        X[d, 48:72] = df.loc[df.index[(d-3)*24:(d-2)*24], 'Price'].to_numpy() # D-3 price
+        X[d, 72:96] = df.loc[df.index[(d-7)*24:(d-6)*24], 'Price'].to_numpy() # D-7 price
+        X[d, 96:120] = df.loc[df.index[(d)*24:(d+1)*24], df.columns[1]].to_numpy() # D load forecast
+        X[d, 120:144] = df.loc[df.index[(d-1)*24:(d)*24], df.columns[1]].to_numpy() # D-1 load forecast
+        X[d, 144:168] = df.loc[df.index[(d-7)*24:(d-6)*24], df.columns[1]].to_numpy() # D-7 load forecast
+        X[d, 168:192] = df.loc[df.index[(d)*24:(d+1)*24], df.columns[2]].to_numpy() # D RES sum forecast
+        X[d, 192:216] = df.loc[df.index[(d-1)*24:(d)*24], df.columns[2]].to_numpy() # D-1 RES sum forecast
+        X[d, 216] = df.loc[df.index[(d-2)*24:(d-1)*24:24], df.columns[3]].to_numpy() # D-2 EUA
+        X[d, 217] = df.loc[df.index[(d-2)*24:(d-1)*24:24], df.columns[4]].to_numpy() # D-2 API2_Coal
+        X[d, 218] = df.loc[df.index[(d-2)*24:(d-1)*24:24], df.columns[5]].to_numpy() # D-2 TTF_Gas
+        X[d, 219] = data.loc[data.index[(d-2)*24:(d-1)*24:24], data.columns[6]].to_numpy() # D-2 Brent oil
         X[d, 220] = data.index[d].weekday()
     # '''
     # input feature selection
@@ -132,8 +145,8 @@ def runoneday(inp):
         colmask[220] = True
     X = X[:, colmask]
     # '''
-    Xf = X[-1:, :]
-    X = X[7:-1, :]
+    Xf = X[-fc_period:, :]
+    X = X[7:-fc_period, :]
 
     inputs = keras.Input(X.shape[1])
     last_layer = keras.layers.BatchNormalization()(inputs)
@@ -188,36 +201,30 @@ def runoneday(inp):
     hist = model.fit(X[trainsubset], Y[trainsubset], epochs=1500, validation_data=(X[valsubset], Y[valsubset]), callbacks=callbacks, batch_size=32, verbose=False)
 
 
-    predDF = pd.DataFrame(index=df.index[-24:])
-    predDF['forecast_quantiles'] = pd.NA
+    predDF = pd.DataFrame(index=df.index[-24*fc_period:])
+    predDF['alphas'] = pd.NA
     pred = model.predict(Xf)
-    quantiles = bern_quants(pred)
-    predDF.loc[predDF.index[:], 'forecast_quantiles'] = [hour for hour in quantiles]
-    predDF.to_csv(os.path.join(f'/home/ahaas/BachelorThesis/forecasts_probNN_BQN2_{trial}_8', datetime.strftime(df.index[-24], '%Y-%m-%d')))
+
+    alpha_reshaped = pred.reshape(fc_period, 24, d_degree + 1)
+    for day in range(fc_period):
+        cumsum_alpha = np.cumsum(alpha_reshaped[day], axis=1)
+        predDF.loc[predDF.index[day*24:(day+1)*24], 'alphas'] = [hour for hour in cumsum_alpha]
+    predDF.to_csv(os.path.join(f'/home/ahaas/BachelorThesis/forecasts_probNN_BQN_{trial}', datetime.strftime(df.index[-24], '%Y-%m-%d')))
     print(datetime.strftime(df.index[-24], '%Y-%m-%d'))
-    print(predDF['forecast_quantiles'].apply(lambda x : np.median(x)))
+    print(predDF['alphas'].apply(lambda x: np.median(x)))
     print(np.mean(hist.history['loss']))
     print(np.mean(hist.history['val_loss']))
     return predDF
 
-#load params
-if trial > 0:
-    with open(f'/home/ahaas/BachelorThesis/params_trial_{distribution}{trial}.json', 'r') as j:
-        params = json.load(j)
 
+inputlist = [(params, day) for day in range(182, len(data) // 24 - 1456)]
 
-inputlist = [(params, day) for day in range(len(data) // 24 - 1456)]
-print(len(inputlist))
 
 start_time = datetime.now()
 print(f'Program started at {start_time.strftime("%Y-%m-%d %H:%M:%S")}')
 
-with Pool(8) as p:
+with Pool(4) as p:
     _ = p.map(runoneday, inputlist)
-
-#runoneday(inputlist[0])
-#for day in inputlist:
-#    runoneday(day)
 
 end_time = datetime.now()
 compute_time = (end_time - start_time).total_seconds()
