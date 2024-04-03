@@ -68,14 +68,14 @@ for num, df in enumerate(param_dfs):
 for num, df in enumerate(param_dfs2):
     param_dfs2[num] = df.iloc[-24*554:, :]
 def plotting(y, crps_observations, crps_observations2=None):
-    fig, ax1 = plt.subplots(figsize=(10, 6), dpi=150)
+    fig, ax1 = plt.subplots(figsize=(10, 6), dpi=300)
 
     # CRPS
     ax1.plot(y[~outliers].index, pd.Series(crps_observations).rolling(window=24 * 7).mean(),
              label='CRPS leadNN-JSU', color='steelblue', linewidth=2)
     if not (crps_observations2 is None):
         ax1.plot(y.index, pd.Series(crps_observations2).rolling(window=24 * 7).mean(),
-                 label='CRPS probNN-JSU', color='lightgray', linewidth=2, linestyle = '--')
+                 label='CRPS probNN-JSU', color='gray', linewidth=2, linestyle = '--')
 
 
     # Intraday Variance with scaling for visibility
@@ -83,12 +83,12 @@ def plotting(y, crps_observations, crps_observations2=None):
 
     ax2 = ax1.twinx()
     ax2.plot(intraday_std.index, intraday_std.rolling(window=7).mean(),
-             label='Scaled Intraday Variance of DA Price', color='goldenrod', linewidth=2)
+             label='Smoothed Intraday Variance of DA Price', color='goldenrod', linewidth=2)
 
     # Aesthetics
     plt.grid(axis='y', linestyle='-', alpha=0.3)
     ax1.set_ylabel('Smoothed CRPS value', fontsize=14)
-    ax2.set_ylabel('Scaled Intraday Variance', fontsize=14)
+    ax2.set_ylabel('Smoothed Intraday Variance', fontsize=14)
     ax1.tick_params(axis='y', labelsize=12)
     ax2.tick_params(axis='y', labelsize=12)
     plt.xticks(rotation=45, fontsize=12)
