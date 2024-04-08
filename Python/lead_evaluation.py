@@ -15,7 +15,7 @@ except:
 
 distribution = 'JSU'
 num_runs = 4
-num_runs2 = 4
+num_runs2 = 0
 outlier_threshold = 1000
 quantile_array = np.arange(0.01, 1, 0.01)
 
@@ -31,7 +31,7 @@ for num in range(num_runs):
     if num_runs == 1:
         file_path = f'/home/ahaas/BachelorThesis/distparams_probNN3_{distribution.lower()}_1'
     else:
-        file_path = f'/home/ahaas/BachelorThesis/distparams_leadNN3.2_{distribution.lower()}_{num + 1}'
+        file_path = f'/home/ahaas/BachelorThesis/distparams_probNN_{distribution.lower()}_{num+1}_Y_11'
     dist_file_list = sorted(os.listdir(file_path))
     print(file_path)
     dist_params = pd.DataFrame()
@@ -72,10 +72,10 @@ def plotting(y, crps_observations, crps_observations2=None):
 
     # CRPS
     ax1.plot(y[~outliers].index, pd.Series(crps_observations).rolling(window=24 * 7).mean(),
-             label='CRPS leadNN-JSU', color='steelblue', linewidth=2)
+             label='CRPS leadNN-JSU', color='dimgrey', linewidth=2)
     if not (crps_observations2 is None):
         ax1.plot(y.index, pd.Series(crps_observations2).rolling(window=24 * 7).mean(),
-                 label='CRPS probNN-JSU', color='gray', linewidth=2, linestyle = '--')
+                 label='CRPS probNN-JSU', color='darkgrey', linewidth=2)
 
 
     # Intraday Variance with scaling for visibility
@@ -83,7 +83,7 @@ def plotting(y, crps_observations, crps_observations2=None):
 
     ax2 = ax1.twinx()
     ax2.plot(intraday_std.index, intraday_std.rolling(window=7).mean(),
-             label='Smoothed Intraday Variance of DA Price', color='goldenrod', linewidth=2)
+             label='Smoothed Intraday Standard Deviation of DA Price', color='coral', linewidth=2, linestyle='--')
 
     # Aesthetics
     plt.grid(axis='y', linestyle='-', alpha=0.3)
@@ -95,61 +95,31 @@ def plotting(y, crps_observations, crps_observations2=None):
     plt.xlabel('Test Period', fontsize=14)
     plt.subplots_adjust(bottom=0.2, top=0.9)
 
-    # Legend
+    # Set the x-axis limits
+    start_date = pd.to_datetime('2020-01-01')
+    end_date = pd.to_datetime('2020-06-30')
+    ax1.set_xlim(start_date, end_date)
+    ax2.set_xlim(start_date, end_date)
+
+    # Legend for models
     lines, labels = ax1.get_legend_handles_labels()
+    legend_models = ax1.legend(lines, labels, loc='lower center', bbox_to_anchor=(0.5, 1.02),
+                               fontsize=14, ncol=len(lines), frameon=False)
+
+    # Legend for Intraday Variance
     lines2, labels2 = ax2.get_legend_handles_labels()
-    ax1.legend(lines + lines2, labels + labels2, loc='lower center', fontsize=14, bbox_to_anchor=(0.5, 1.0), ncol=3)
+    legend_variance = ax2.legend(lines2, labels2, loc='lower center', bbox_to_anchor=(0.5, 1.08),
+                                 fontsize=14, ncol=len(lines2), frameon=False)
 
-    plt.tight_layout()
+    # Manually adjust legend position
+    plt.setp(legend_models.get_title(), multialignment='center')
+    plt.setp(legend_variance.get_title(), multialignment='center')
+
+    # Ensure the legends are drawn above the plot area
+    #plt.gca().add_artist(legend_models)
+
+    plt.tight_layout(rect=[0, 0.03, 1, 0.95])
     plt.show()
-
-def plot_lead_bar(y, loc_series, quantiles):
-    lead_crsps = []
-    lead_mae = []
-    lead_rsme = []
-    for lead in range(24):
-        quantiles_lead = quantiles[lead::24]
-        loc_series_lead = loc_series[lead::24]
-        y_lead = y[lead::24]
-        median_series = quantiles_lead.apply(lambda x: x[50])
-        crps_observations = [pinball_score(observed, quantiles_row) for observed, quantiles_row in
-                             zip(y_lead, quantiles_lead)]
-        mae = np.abs(y_lead.values - median_series).mean()
-        rmse = np.sqrt((y_lead.values - loc_series_lead) ** 2).mean()
-        #print(f'Results for lead time: {lead}')
-        #print('Observations: ' + str(len(y)) + '\n')
-        #print('MAE: ' + str(mae) + '\n' + 'RMSE: ' + str(rmse))
-        #print('CRPS: ' + str(np.mean(crps_observations)) + '\n\n')
-        lead_mae.append(mae)
-        lead_rsme.append(rmse)
-        lead_crsps.append(np.mean(crps_observations))
-
-    hours = np.arange(24)
-    bar_width = 0.3
-    bar_offset = np.arange(24) * (1)
-
-    fig, ax1 = plt.subplots(figsize=(10, 6), dpi=600)
-
-    ax1.bar(bar_offset - bar_width/2, lead_mae, width=bar_width, label='MAE', color='lightgrey')
-    #ax1.bar(bar_offset, lead_rsme, width=bar_width, label='RSME', color='grey')
-    ax1.bar(bar_offset + bar_width/2, lead_crsps, width=bar_width, label='CRPS', color='blue')
-
-    ax2 = ax1.twinx()
-    ax2.plot(hours, y.groupby(y.index.hour).mean(), label='Mean price', linestyle='--', color='red')
-    ax2.plot(hours, y.groupby(y.index.hour).std(), label='Standard deviation price', linestyle='--', color='orange')
-    ax2.set_ylim(bottom=0)
-
-    ax1.legend(loc='upper left', fontsize=14)
-    ax2.legend(loc='upper right', fontsize=14)
-    ax1.set_ylabel('Evaluation metrics', fontsize=14)
-    ax2.set_ylabel('DA Price',fontsize=14)
-    ax1.tick_params(axis='y', labelsize=12)
-    ax2.tick_params(axis='y', labelsize=12)
-    plt.xticks(fontsize=14)
-    plt.xlabel('Hours', fontsize=14)
-    #plt.title('Evaluation metrics by lead time')
-    plt.show()
-
 
 
 
@@ -211,7 +181,7 @@ if distribution.lower() == 'normal':
         print('q-Ens CRPS: ' + str(np.mean(qEns_crps_observations2)))
 
         plotting(y, qEns_crps_observations2)
-        plot_lead_bar(y, loc_series, qEns_quantiles)
+        #plot_lead_bar(y, loc_series, qEns_quantiles)
 
         # p-Ens averaging (vertical) via sampling
         for sample_size in [50, 100, 250, 500, 1000, 2500]:
@@ -253,16 +223,6 @@ if distribution.lower() == 'jsu':
         y = data.loc[df.index, 'Price']
         crps_observations = [pinball_score(observed, quantiles_row) for observed, quantiles_row in zip(y, quantiles)]
 
-        #detect outliers
-        df['crps'] = crps_observations
-        outlier_mask = df['crps'] > outlier_threshold
-        outliers.append(outlier_mask)
-
-        no_outlier_df = df.loc[~outlier_mask]
-        outlier_df = df.loc[outlier_mask]
-        #dd = data[(data.index > '2020-09-01') & (data.index < '2020-10-01')]
-        #print(data['Price'].min())
-        #print(data['Price'].max())
 
         mae = np.abs(y.values - median_series).mean()
         rmse = np.sqrt((y.values - df[f'loc_{num}']) ** 2).mean()
@@ -270,7 +230,6 @@ if distribution.lower() == 'jsu':
         print('Observations: ' + str(len(y)) + '\n')
         print('MAE: ' + str(mae) + '\n' + 'RMSE: ' + str(rmse))
         print('CRPS: ' + str(np.mean(crps_observations)) + '\n\n')
-        print('CRPS without outliers: ' +str(no_outlier_df['crps'].mean()))
 
         #plotting(y, crps_observations)
 

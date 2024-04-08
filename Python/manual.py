@@ -8,10 +8,10 @@ import sqlite3
 import scipy
 '''
 distribution = 'JSU'
-trial = 4
+trial = 1
 optuna.logging.get_logger('optuna').addHandler(logging.StreamHandler(sys.stdout))
 
-study_name = f'FINAL_DE_selection_BQN_{trial}'
+study_name = f'FINAL_DE_selection_single_{distribution.lower()}_{trial}'
 storage_directory = '/home/ahaas/BachelorThesis/trialfiles'
 storage_name = f'sqlite:///{os.path.join(storage_directory, f"{study_name}.db")}'
 
@@ -29,9 +29,9 @@ print('Params: ')
 for key, value in best_trial.params.items():
     print(f'  {key}: {value}')
 
-with open(f'/home/ahaas/BachelorThesis/params_trial_BQN_{trial}.json', 'w') as j:
+with open(f'/home/ahaas/BachelorThesis/params_trial_single_{trial}.json', 'w') as j:
     json.dump(best_trial.params, j)
-    '''
+'''
 
 optuna.logging.get_logger('optuna').addHandler(logging.StreamHandler(sys.stdout))
 study_name = f'FINAL_DE_selection_single_jsu_1'
@@ -59,3 +59,9 @@ try:
         print(f"Best parameters: {best_params}, \nBest score: {best_score}")
 except:
     print('Study does not exist or encountered an error.')
+
+data = pd.read_csv(f'/home/ahaas/BachelorThesis/Datasets/DE.csv', index_col=0)
+data.index = pd.to_datetime(data.index)
+
+
+

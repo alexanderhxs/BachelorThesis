@@ -8,36 +8,25 @@ import re
 import ast
 
 #define evaluated models
-fcs = {'q-Ens BQN': '/home/ahaas/BachelorThesis/forecasts_probNN_BQN_q-Ens',
-       'q-Ens probNN-JSU': '/home/ahaas/BachelorThesis/forecasts_probNN_jsu_q-Ens',
-       #'q-Ens probNN-N': '/home/ahaas/BachelorThesis/forecasts_probNN_normal_q-Ens',
+fcs = {'q-Ens probNN-JSU': '/home/ahaas/BachelorThesis/forecasts_probNN_jsu_q-Ens',
+       'q-Ens leadNN-JSU':  f'/home/ahaas/BachelorThesis/forecasts_leadNN_jsu_q-Ens',
+       'q-Ens PLACEHOLDER': '/home/ahaas/BachelorThesis/forecasts_probNN_normal_q-Ens',
+       'q-Ens BQN': '/home/ahaas/BachelorThesis/forecasts_probNN_BQN_q-Ens',
        #'q-Ens leadNN-JSU':  f'/home/ahaas/BachelorThesis/forecasts_leadNN_jsu_q-Ens'
        }
-agg_window = 1
+agg = 'lead'
 #get data
 data = pd.read_csv('/home/ahaas/BachelorThesis/Datasets/DE.csv', index_col=0)
 data.index = pd.to_datetime(data.index)
 quantile_array = np.arange(0.01, 1, 0.01)
 
-def find_bin(value, quantiles):
-    for i, q in enumerate(quantiles):
-        if value <= q:
-            return i
-    return len(quantiles)
+def pinball_score(observed, pred_quantiles):
+    quantiles = np.arange(0.01, 1, 0.01)
+    scores = pd.Series(np.maximum((1 - quantiles) * (pred_quantiles - observed), quantiles * (observed - pred_quantiles)))
+    return scores.mean()
 
-B = np.zeros((12+1, 99))
-for d in range(12+1):
-    B[d, :] = sps.binom.pmf(d, 12, quantile_array)
-def bern_quants(alphas):
-    return np.dot(alphas, B)
 
-def winkler_score(y, lower_bound, upper_bound, alpha):
-    score = np.where(y > upper_bound, (upper_bound - lower_bound) + 2/alpha * (y - upper_bound),
-                     np.where(y < lower_bound, (upper_bound - lower_bound) + 2/alpha * (lower_bound - y),
-                              upper_bound - lower_bound))
-    return score
-
-fig, axs = plt.subplots(1, 2, figsize=(16, 7), dpi=300, sharey=True)
+fig, axs = plt.subplots(1, len(fcs), figsize=(20, 6), dpi=300, sharey=True)
 axs = axs.flatten()
 #get data from models, stored in df
 for idx, (model, filepath) in enumerate(fcs.items()):
@@ -96,39 +85,52 @@ for idx, (model, filepath) in enumerate(fcs.items()):
     else:
         raise ValueError('ERROR: could not find ModelType')
 
-    bin_counts = np.zeros(100)
-
     df.index = pd.to_datetime(df.index)
-    for y, quantiles in zip(data.loc[df.index, 'Price'], df[f'forecast_quantiles']):
-        bin_index = find_bin(y, quantiles)
-        bin_counts[bin_index] += 1
+    y = data.loc[df.index, 'Price']
+    crps_observations = [pinball_score(observed, quantiles_row) for observed, quantiles_row in zip(y, df[f'forecast_quantiles'])]
+    ae_observations = np.abs(y - df[f'forecast_quantiles'].apply(lambda x: x[49]))
+    df['crps'] = crps_observations
+    df['mae'] = ae_observations
 
-    normalized_bin_counts = bin_counts/sum(bin_counts)
-    agg_bin_counts = [sum(normalized_bin_counts[i:i + agg_window]) for i in range(0, len(normalized_bin_counts), agg_window)]
+    if agg.lower() == 'lead':
+        crps_lead = df['crps'].groupby(df.index.hour).mean()
+        mae_lead = df['mae'].groupby(df.index.hour).mean()
+        y_mean = y.groupby(y.index.hour).mean()
+        y_std = y.groupby(y.index.hour).std()
+    elif agg.lower() == 'day':
+        crps_lead = df['crps'].groupby(df.index.weekday).mean()
+        mae_lead = df['mae'].groupby(df.index.weekday).mean()
+        y_mean = y.groupby(y.index.weekday).mean()
+        y_std = y.groupby(y.index.weekday).std()
+    else:
+        raise ValueError('Wrong Aggregation scheme')
 
-    bar_width = agg_window * 0.8
-    offset = agg_window/2
-    axs[idx].bar(np.arange(0, 100, agg_window) + offset, agg_bin_counts, width=bar_width, color='skyblue')
-    axs[idx].set_ylabel('Share of bin', fontsize=14)
-    axs[idx].set_xlabel('Percentile-level bin', fontsize=14)
+    bars = np.arange(len(crps_lead))
+    bar_width = 0.3
+    bar_offset = np.arange(len(crps_lead)) * (1)
+
+    axs[idx].bar(bar_offset - bar_width / 2, mae_lead, width=bar_width, label='MAE', color='lightgrey')
+    axs[idx].bar(bar_offset + bar_width / 2, crps_lead, width=bar_width, label='CRPS', color='blue')
     axs[idx].set_title(model, fontsize=14, fontweight='bold')
-    axs[idx].tick_params(axis='both', which='major', labelsize=14)
-    axs[idx].tick_params(axis='both', which='minor', labelsize=14)
-    axs[idx].axhline(y=1/len(agg_bin_counts), color='coral', linestyle='--')
 
-    ks_stat, p_val = sps.kstest(np.cumsum(agg_bin_counts), 'uniform')
+    if agg.lower() == 'day':
+        wochentage = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+        axs[idx].set_xticks(bar_offset)
+        axs[idx].set_xticklabels(wochentage)
 
-    forecast_quantiles = df[f'forecast_quantiles']
-    w_score_05 = winkler_score(y, forecast_quantiles.apply(lambda x: x[24]).values, forecast_quantiles.apply(lambda x: x[74]).values, 0.5)
-    w_score_01 = winkler_score(y, forecast_quantiles.apply(lambda x: x[4]).values, forecast_quantiles.apply(lambda x: x[94]).values, 0.1)
-    w_score_002 = winkler_score(y, forecast_quantiles.apply(lambda x: x[0]).values, forecast_quantiles.apply(lambda x: x[-1]).values, 0.02)
+    ax2 = axs[idx].twinx()
+    ax2.plot(bars, y_mean, label='Mean price', linestyle='--', color='red')
+    ax2.plot(bars, y_std, label='Standard deviation price', linestyle='--', color='orange')
+    ax2.set_ylim(bottom=0)
 
-    print(f'\n\nTest for uniform distribution of model {model}:\np-value: {p_val}\nTest statistik: {ks_stat}\n')
-    print(f'Coverage of the PI: {1-(agg_bin_counts[0] + agg_bin_counts[-1])}')
-    print(f'Average Winkler score for nievau alpha = 0.5: {np.mean(w_score_05)}')
-    print(f'Average Winkler score for nievau alpha = 0.1: {np.mean(w_score_01)}')
-    print(f'Average Winkler score for nievau alpha = 0.02: {np.mean(w_score_002)}')
+handles1, labels1 = axs[idx].get_legend_handles_labels()
+handles2, labels2 = ax2.get_legend_handles_labels()
 
 
-plt.tight_layout()
+combined_handles = handles1 + handles2
+combined_labels = labels1 + labels2
+
+fig.tight_layout(rect=[0, 0.05, 1, 0.95])
+fig.legend(combined_handles, combined_labels, loc='lower center', ncol=len(combined_handles), bbox_to_anchor=(0.5, -0.01), fontsize=14)
+
 plt.show()
