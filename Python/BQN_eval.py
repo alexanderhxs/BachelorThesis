@@ -51,6 +51,7 @@ for num in range(num_runs):
 
     quant_dfs.append(fc_df.add_suffix(f'_{num+1}'))
 
+#format data right
 for num, df in enumerate(quant_dfs):
     df[f'alphas_{num + 1}'] = df[f'alphas_{num + 1}'].apply(lambda x: re.sub(r'\[\s+', '[', x))
     df[f'alphas_{num + 1}'] = df[f'alphas_{num + 1}'].apply(lambda x: x.replace(' ', ','))
@@ -60,6 +61,7 @@ for num, df in enumerate(quant_dfs):
     quant_dfs[num] = df
 
 data.index = pd.to_datetime(data.index)
+#compute individual scores
 for num, df in enumerate(quant_dfs):
     mean_series = df[f'alphas_{num+1}'].apply(lambda x: np.mean(x))
     y = data.loc[df.index, 'Price']
@@ -84,16 +86,16 @@ qEns_alphas = all_df.apply(np.mean, axis=1)
 qEns_quantiles = qEns_alphas.apply(bern_quants)
 qEns_crps_obs = [pinball_score(obs, np.array(pred)) for obs, pred in zip(y, qEns_quantiles.values)]
 qEns_CRPS = np.mean(qEns_crps_obs)
-median_series = qEns_quantiles.apply(lambda x: x[50])
-rmse = np.sqrt((y.values - qEns_alphas.apply(np.mean)) ** 2).mean()
+median_series = qEns_quantiles.apply(lambda x: x[49])
+rmse = np.sqrt(((y.values - qEns_alphas.apply(np.mean)) ** 2).mean())
 mae = np.abs(y.values - median_series).mean()
 
 print('\n\nq-Ens MAE: ' + str(mae))
 print('q-Ens RMSE: ' + str(rmse))
 print('q-Ens CRPS: ' + str(np.mean(qEns_CRPS)) )
 
-if not os.path.exists(f'/home/ahaas/BachelorThesis/forecasts_probNN_BQN_q-Ens'):
-    os.mkdir(f'/home/ahaas/BachelorThesis/forecasts_probNN_BQN_q-Ens')
+#if not os.path.exists(f'/home/ahaas/BachelorThesis/forecasts_probNN_BQN_q-Ens'):
+#    os.mkdir(f'/home/ahaas/BachelorThesis/forecasts_probNN_BQN_q-Ens')
 
 #qEns_quantiles.to_csv(f'/home/ahaas/BachelorThesis/forecasts_probNN_BQN_q-Ens/predictions.csv')
 

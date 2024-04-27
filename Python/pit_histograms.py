@@ -8,10 +8,10 @@ import re
 import ast
 
 #define evaluated models
-fcs = {'q-Ens BQN': '/home/ahaas/BachelorThesis/forecasts_probNN_BQN_q-Ens',
-       'q-Ens probNN-JSU': '/home/ahaas/BachelorThesis/forecasts_probNN_jsu_q-Ens',
-       #'q-Ens probNN-N': '/home/ahaas/BachelorThesis/forecasts_probNN_normal_q-Ens',
-       #'q-Ens leadNN-JSU':  f'/home/ahaas/BachelorThesis/forecasts_leadNN_jsu_q-Ens'
+fcs = {'JSU': f'/home/ahaas/BachelorThesis/distparams_singleNN1_jsu_4',
+       #'q-Ens leadNN-JSU':  f'/home/ahaas/BachelorThesis/forecasts_leadNN_jsu_q-Ens',
+       #'q-Ens singleNN-JSU': '/home/ahaas/BachelorThesis/forecasts_singleNN_jsu_q-Ens',
+        #'q-Ens BQN': '/home/ahaas/BachelorThesis/forecasts_probNN_BQN_q-Ens'
        }
 agg_window = 1
 #get data
@@ -37,7 +37,7 @@ def winkler_score(y, lower_bound, upper_bound, alpha):
                               upper_bound - lower_bound))
     return score
 
-fig, axs = plt.subplots(1, 2, figsize=(16, 7), dpi=300, sharey=True)
+fig, axs = plt.subplots(2, 2, figsize=(16, 9), dpi=300, sharey=True)
 axs = axs.flatten()
 #get data from models, stored in df
 for idx, (model, filepath) in enumerate(fcs.items()):

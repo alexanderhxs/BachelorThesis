@@ -53,11 +53,11 @@ def custom_loss_function(y, rv_y):
     return -rv_y.log_prob(y)
 
 missing_models = []
-def runoneday(params, dayno, trial, X_perm, hour):
+def runoneday(params, dayno, trial, X_perm):
     df = data.iloc[dayno*24:dayno*24+1456*24+24]
 
     #set safe_path for results
-    safe_path = f'/home/ahaas/BachelorThesis/distparams_probNN_{distribution.lower()}_{trial}_Y_1{hour}'
+    safe_path = f'/home/ahaas/BachelorThesis/distparams_probNN_{distribution.lower()}_{trial}_R'
     if not os.path.exists(safe_path):
         os.mkdir(safe_path)
 
@@ -235,7 +235,7 @@ def runoneday(params, dayno, trial, X_perm, hour):
         params = {k: [float(e) for e in v.numpy()[0]] for k, v in getters.items()}
         print(params)
         json.dump(params, open(os.path.join(safe_path, datetime.strftime(df.index[-24], '%Y-%m-%d')), 'w'))
-        print(f'{datetime.strftime(df.index[-24], "%Y-%m-%d")}, Trial: {trial}, Hour: {hour}')
+        print(f'{datetime.strftime(df.index[-24], "%Y-%m-%d")}, Trial: {trial}')
     else:
         raise ValueError('Distribution Error')
     return
@@ -250,36 +250,38 @@ for t in range(1, 5):
 inputlist = [(params_list[trial-1], day, trial) for trial in range(1, 5) for day in range(182, len(data) // 24 - 1456)]
 
 
-with Pool(4) as p:
-    for hour in range(1,25):
-        #collecting data for permutation
-        X_perm = np.zeros((554 + 7, INP_SIZE))
-        for d in range(7, 554 + 7):
-            X_perm[d, :24] = df_test.iloc[(d - 1) * 24:(d) * 24, 0].to_numpy()  # D-1 price
-            X_perm[d, 24:48] = df_test.iloc[(d - 2) * 24:(d - 1) * 24, 0].to_numpy()  # D-2 price
-            X_perm[d, 48:72] = df_test.iloc[(d - 3) * 24:(d - 2) * 24, 0].to_numpy()  # D-3 price
-            X_perm[d, 72:96] = df_test.iloc[(d - 7) * 24:(d - 6) * 24, 0].to_numpy()  # D-7 price
-            X_perm[d, 96:120] = df_test.iloc[(d) * 24:(d + 1) * 24, 1].to_numpy()  # D load forecast
-            X_perm[d, 120:144] = df_test.iloc[(d - 1) * 24:(d) * 24, 1].to_numpy()  # D-1 load forecast
-            X_perm[d, 144:168] = df_test.iloc[(d - 7) * 24:(d - 6) * 24, 1].to_numpy()  # D-7 load forecast
-            X_perm[d, 168:192] = df_test.iloc[(d) * 24:(d + 1) * 24, 2].to_numpy()  # D RES sum forecast
-            X_perm[d, 192:216] = df_test.iloc[(d - 1) * 24:(d) * 24, 2].to_numpy()  # D-1 RES sum forecast
-            X_perm[d, 216] = df_test.iloc[(d - 2) * 24:(d - 1) * 24:24, 3].to_numpy()  # D-2 EUA
-            X_perm[d, 217] = df_test.iloc[(d - 2) * 24:(d - 1) * 24:24, 4].to_numpy()  # D-2 API2_Coal
-            X_perm[d, 218] = df_test.iloc[(d - 2) * 24:(d - 1) * 24:24, 5].to_numpy()  # D-2 TTF_Gas
-            X_perm[d, 219] = df_test.iloc[(d - 2) * 24:(d - 1) * 24:24, 6].to_numpy()  # D-2 Brent oil
-            X_perm[d, 220] = df_test.index[d].weekday()
-        #skip first seven days
-        X_perm = X_perm[7:]
+with Pool(8) as p:
+    #collecting data for permutation
+    X_perm = np.zeros((554 + 7, INP_SIZE))
+    for d in range(7, 554 + 7):
+        X_perm[d, :24] = df_test.iloc[(d - 1) * 24:(d) * 24, 0].to_numpy()  # D-1 price
+        X_perm[d, 24:48] = df_test.iloc[(d - 2) * 24:(d - 1) * 24, 0].to_numpy()  # D-2 price
+        X_perm[d, 48:72] = df_test.iloc[(d - 3) * 24:(d - 2) * 24, 0].to_numpy()  # D-3 price
+        X_perm[d, 72:96] = df_test.iloc[(d - 7) * 24:(d - 6) * 24, 0].to_numpy()  # D-7 price
+        X_perm[d, 96:120] = df_test.iloc[(d) * 24:(d + 1) * 24, 1].to_numpy()  # D load forecast
+        X_perm[d, 120:144] = df_test.iloc[(d - 1) * 24:(d) * 24, 1].to_numpy()  # D-1 load forecast
+        X_perm[d, 144:168] = df_test.iloc[(d - 7) * 24:(d - 6) * 24, 1].to_numpy()  # D-7 load forecast
+        X_perm[d, 168:192] = df_test.iloc[(d) * 24:(d + 1) * 24, 2].to_numpy()  # D RES sum forecast
+        X_perm[d, 192:216] = df_test.iloc[(d - 1) * 24:(d) * 24, 2].to_numpy()  # D-1 RES sum forecast
+        X_perm[d, 216] = df_test.iloc[(d - 2) * 24:(d - 1) * 24:24, 3].to_numpy()  # D-2 EUA
+        X_perm[d, 217] = df_test.iloc[(d - 2) * 24:(d - 1) * 24:24, 4].to_numpy()  # D-2 API2_Coal
+        X_perm[d, 218] = df_test.iloc[(d - 2) * 24:(d - 1) * 24:24, 5].to_numpy()  # D-2 TTF_Gas
+        X_perm[d, 219] = df_test.iloc[(d - 2) * 24:(d - 1) * 24:24, 6].to_numpy()  # D-2 Brent oil
+        X_perm[d, 220] = df_test.index[d].weekday()
+    #skip first seven days
+    X_perm = X_perm[7:]
 
-        # shuffeling selected rows
-        perm_inputs = hour-1
-        selcted_inputs = X_perm[:, perm_inputs]
-        np.random.shuffle(selcted_inputs)
-        X_perm[:, perm_inputs] = selcted_inputs
-        inputlist = [(params_list[trial - 1], day, trial, X_perm, hour) for trial in range(1, 5) for day in
-                     range(182, len(data) // 24 - 1456)]
-        _ = p.starmap(runoneday, inputlist)
+    #shuffeling selected rows
+    perm_inputs = range(168, 192)
+    selected_inputs = X_perm[:, perm_inputs]
+    #shuffle columnwise
+    for i in range(selected_inputs.shape[1]):
+        np.random.shuffle(selected_inputs[:, i])
+
+    X_perm[:, perm_inputs] = selected_inputs
+    inputlist = [(params_list[trial - 1], day, trial, X_perm) for trial in range(1, 5) for day in
+                 range(182, len(data) // 24 - 1456)]
+    _ = p.starmap(runoneday, inputlist)
 
 
 

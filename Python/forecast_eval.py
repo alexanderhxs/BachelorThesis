@@ -15,26 +15,25 @@ length = 24
 draw_lines = False
 draw_shades = True
 
-fcs = {'q-Ens BQN': '../forecasts_probNN_BQN_q-Ens',
-       'q-Ens JSU': '../forecasts_probNN_jsu_q-Ens',
-       'q-Ens Normal': '../forecasts_probNN_normal_q-Ens'
+fcs = {'q-Ens BQN': '/home/ahaas/BachelorThesis/forecasts_probNN_BQN_q-Ens',
+       'q-Ens JSU': '/home/ahaas/BachelorThesis/forecasts_probNN_jsu_q-Ens',
+       #'q-Ens Normal': '/home/ahaas/BachelorThesis/forecasts_probNN_normal_q-Ens'
        }
 
+#select random date
 start_datetime = datetime.strptime('2019-09-01', "%Y-%m-%d")
 end_datetime = datetime.strptime('2020-12-31', "%Y-%m-%d")
-
 delta = end_datetime - start_datetime
 
 random_offset = random.randint(0, delta.days)
 random_date = start_datetime + timedelta(days=random_offset)
 
-# Konvertiere das zufällige Datum in einen String und gib es zurück
 start_time = random_date.strftime("%Y-%m-%d")
-#start_time = '2020-09-24'
+start_time = '2020-04-28'
 
 
 
-data = pd.read_csv('../Datasets/DE.csv', index_col=0)
+data = pd.read_csv('/home/ahaas/BachelorThesis/Datasets/DE.csv', index_col=0)
 data.index = pd.to_datetime(data.index)
 quantile_array = np.arange(0.01, 1, 0.01)
 timeframe = pd.date_range(pd.to_datetime(start_time), periods=length, freq='H')
@@ -45,7 +44,7 @@ for d in range(12+1):
 def bern_quants(alphas):
     return np.dot(alphas, B)
 
-fig, axs = plt.subplots(nrows=(len(fcs)), ncols=1, figsize=(16,12), sharey=True, dpi=300)
+fig, axs = plt.subplots(nrows=(len(fcs)), ncols=1, figsize=(16,9), sharey=True, dpi=300)
 
 for idx, (model, filepath) in enumerate(fcs.items()):
 
@@ -125,6 +124,7 @@ for idx, (model, filepath) in enumerate(fcs.items()):
             axs[idx].plot(timeframe, df.loc[timeframe, 'forecast_quantiles'].apply(lambda x: x[98-q]), color='blue',alpha=0.1 + (q/100))
 
     axs[idx].set_title(model, fontsize=14, fontweight='bold')
+    #axs[idx].tick_params(axis='x', rotation=45)
 
     #average quantile dist
     avg_dist1 = df['forecast_quantiles'].apply(lambda x: x[-1] - x[0]).mean()

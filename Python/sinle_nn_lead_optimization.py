@@ -115,6 +115,7 @@ def objective(trial):
     Yfwhole = Yf.copy()
     metrics_sub = []
 
+    #generate params
     params_suggested = {
         'dropout': trial.suggest_categorical('dropout', binopt),
         'dropout_rate': trial.suggest_float('dropout_rate', 0, 1),

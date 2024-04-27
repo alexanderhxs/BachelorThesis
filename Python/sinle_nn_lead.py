@@ -23,9 +23,12 @@ if not os.path.exists(filepath):
     os.mkdir(filepath)
 
 #load hyperparameter
-with open(f'/home/ahaas/BachelorThesis/params_trial_single_{trial}.json', 'r') as j:
-    params = json.load(j)
-
+try:
+    with open(f'../params_trial_single_{trial}.json', 'r') as j:
+        params = json.load(j)
+except:
+    with open(f'/home/ahaas/BachelorThesis/params_trial_single_{trial}.json', 'r') as j:
+        params = json.load(j)
 
 #load data
 try:
@@ -168,7 +171,7 @@ def runoneday(inp):
                     lambda t: tfd.JohnsonSU(
                         loc=t[..., 0],
                         scale=1e-3 + 3 * tf.math.softplus(t[..., 1]),
-                        tailweight= 1 + 3 * tf.math.softplus(t[..., 2]),
+                        tailweight=1 + 3 * tf.math.softplus(t[..., 2]),
                         skewness=t[..., 3]))(linear)
 
         else:
@@ -196,16 +199,19 @@ def runoneday(inp):
             fcs[k].append(v.numpy().tolist()[0])
     print(fcs)
     with open(os.path.join(filepath, datetime.strftime(df.index[-24], '%Y-%m-%d')), 'w') as j:
-        json.dump(params, j)
+        json.dump(fcs, j)
+    print(datetime.strftime(df.index[-24], '%Y-%m-%d'))
+    print(datetime.now().strftime('%H:%M:%S'))
 
 
 
 #realigning forecasts, for daily predictions
-inputlist = [(params, day) for day in range(182, len(data) // 24 - 1456)]
+inputlist = [(params, day) for day in range(182, 736)]
 
 #for e in inputlist:
 #     _ = runoneday(e)
 #print(os.cpu_count())
 
-with Pool(8) as p:
-    _ = p.map(runoneday, inputlist)
+if __name__ == '__main__':
+    with Pool(16) as p:
+        _ = p.map(runoneday, inputlist)

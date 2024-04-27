@@ -31,7 +31,7 @@ for key, value in best_trial.params.items():
 
 with open(f'/home/ahaas/BachelorThesis/params_trial_single_{trial}.json', 'w') as j:
     json.dump(best_trial.params, j)
-'''
+
 
 optuna.logging.get_logger('optuna').addHandler(logging.StreamHandler(sys.stdout))
 study_name = f'FINAL_DE_selection_single_jsu_1'
@@ -63,5 +63,8 @@ except:
 data = pd.read_csv(f'/home/ahaas/BachelorThesis/Datasets/DE.csv', index_col=0)
 data.index = pd.to_datetime(data.index)
 
-
-
+'''
+for trial in range(1, 5):
+    with open(f'/home/ahaas/BachelorThesis/params_trial_jsu_{trial}.json', 'r') as j:
+        params = json.load(j)
+    print(params)

@@ -10,9 +10,9 @@ import ast
 #define evaluated models
 fcs = {'q-Ens probNN-JSU': '/home/ahaas/BachelorThesis/forecasts_probNN_jsu_q-Ens',
        'q-Ens leadNN-JSU':  f'/home/ahaas/BachelorThesis/forecasts_leadNN_jsu_q-Ens',
-       'q-Ens PLACEHOLDER': '/home/ahaas/BachelorThesis/forecasts_probNN_normal_q-Ens',
+       'q-Ens singleNN-JSU 4 trials': '/home/ahaas/BachelorThesis/forecasts_singleNN_jsu_q-Ens',
        'q-Ens BQN': '/home/ahaas/BachelorThesis/forecasts_probNN_BQN_q-Ens',
-       #'q-Ens leadNN-JSU':  f'/home/ahaas/BachelorThesis/forecasts_leadNN_jsu_q-Ens'
+       'q-Ens singleNN-JSU 3 trials':  '/home/ahaas/BachelorThesis/forecasts_singleNN2_jsu_q-Ens',
        }
 agg = 'lead'
 #get data
@@ -87,8 +87,13 @@ for idx, (model, filepath) in enumerate(fcs.items()):
 
     df.index = pd.to_datetime(df.index)
     y = data.loc[df.index, 'Price']
-    crps_observations = [pinball_score(observed, quantiles_row) for observed, quantiles_row in zip(y, df[f'forecast_quantiles'])]
+
+    #calculate scores and cap them
+    crps_observations = np.array([pinball_score(observed, quantiles_row) for observed, quantiles_row in zip(y, df[f'forecast_quantiles'])])
     ae_observations = np.abs(y - df[f'forecast_quantiles'].apply(lambda x: x[49]))
+    crps_observations[crps_observations > 100] = 100
+    ae_observations[ae_observations > 250] = 250
+
     df['crps'] = crps_observations
     df['mae'] = ae_observations
 
@@ -133,4 +138,37 @@ combined_labels = labels1 + labels2
 fig.tight_layout(rect=[0, 0.05, 1, 0.95])
 fig.legend(combined_handles, combined_labels, loc='lower center', ncol=len(combined_handles), bbox_to_anchor=(0.5, -0.01), fontsize=14)
 
+plt.show()
+
+fix, ax = plt.subplots(dpi=300, figsize=(16, 9))
+for idx, (model, filepath) in enumerate(fcs.items()):
+    if model.startswith('q-Ens singleNN') or model.startswith('q-Ens probNN'):
+        df = pd.read_csv(os.path.join(filepath, 'predictions.csv'), index_col=0)
+        df = df.rename(columns={'0': 'forecast_quantiles'})
+        df[f'forecast_quantiles'] = df[f'forecast_quantiles'].apply(lambda x: re.sub(r'\[\s+', '[', x))
+        df[f'forecast_quantiles'] = df[f'forecast_quantiles'].apply(lambda x: x.replace(' ', ','))
+        df[f'forecast_quantiles'] = df[f'forecast_quantiles'].apply(lambda x: re.sub(',+', ',', x))
+        df[f'forecast_quantiles'] = df[f'forecast_quantiles'].apply(ast.literal_eval)
+        df[f'forecast_quantiles'] = df[f'forecast_quantiles'].apply(lambda x: np.array(x))
+
+        df.index = pd.to_datetime(df.index)
+        y = data.loc[df.index, 'Price']
+
+        crps_observations = np.array(
+            [pinball_score(observed, quantiles_row) for observed, quantiles_row in zip(y, df[f'forecast_quantiles'])])
+        crps_observations[crps_observations > 100] = 100
+        df['crps'] = crps_observations
+
+        crps_lead = df['crps'].groupby(df.index.hour).mean()
+
+
+        ax.plot(range(24), crps_lead, label = model, linewidth=2, marker='o', linestyle='--')
+
+plt.xlabel('Lead Time', fontsize=14)
+plt.ylabel('CRPS value', fontsize=14)
+plt.xticks(range(24), fontsize=14)
+plt.yticks(fontsize=14)
+plt.grid(True, which='both', axis='y', color='lightgray', linestyle='--', linewidth=1.5)
+legend = plt.legend(fontsize=14)
+plt.tight_layout()
 plt.show()
